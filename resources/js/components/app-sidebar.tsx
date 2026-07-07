@@ -1,5 +1,15 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BarChart3,
+    CalendarRange,
+    ClipboardList,
+    Gauge,
+    GraduationCap,
+    LayoutGrid,
+    LifeBuoy,
+    Target,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -22,18 +32,48 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    {
+        title: 'Key Result Areas',
+        href: '/kras',
+        icon: Target,
+    },
+    {
+        title: 'KPI Tracker',
+        href: '/kpis',
+        icon: Gauge,
+    },
+    {
+        title: 'Action Plans',
+        href: '/action-plans',
+        icon: ClipboardList,
+    },
+    {
+        title: 'Responsible Units',
+        href: '/units',
+        icon: Users,
+    },
+    {
+        title: 'Reports & Analytics',
+        href: '/reports',
+        icon: BarChart3,
+    },
+    {
+        title: 'Academic Years',
+        href: '/academic-years',
+        icon: CalendarRange,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
+        title: 'Help & Support',
+        href: '/support',
+        icon: LifeBuoy,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
+        title: 'UV Website',
+        href: 'https://www.uv.edu.ph',
+        icon: GraduationCap,
     },
 ];
 
