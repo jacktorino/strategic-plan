@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\AdminUnitController;
 use App\Http\Controllers\Admin\KpiSubmissionController as AdminSubmissionController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminAcademicYearController;
+use App\Http\Controllers\Admin\UserApprovalController;
 
 // Staff / Unit Imports
 use App\Http\Controllers\Unit\UnitKpiController;
@@ -28,14 +29,19 @@ use App\Http\Controllers\Unit\UnitReportController;
 
 Route::inertia('/', 'welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    
+// Public — reachable while logged out, and also where EnsureAccountIsApproved
+// sends a pending/rejected user right after it logs them back out.
+Route::inertia('/registration-pending', 'auth/registration-pending')
+    ->name('registration.pending');
+
+Route::middleware(['auth', 'verified', 'account.approved'])->group(function () {
+
     // Shared Dashboard route
-    Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // 1. PRESIDENT ROUTES
     Route::middleware('role:president')->group(function () {
-      
+
         Route::get('kras', [KraController::class, 'index'])->name('kras.index');
         Route::get('kpis', [KpiController::class, 'index'])->name('kpis.index');
         Route::get('action-plans', [ActionPlanController::class, 'index'])->name('action-plans.index');
@@ -55,11 +61,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('kpi-submissions', [AdminSubmissionController::class, 'index'])->name('kpi-submissions');
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports');
         Route::get('academic-years', [AdminAcademicYearController::class, 'index'])->name('academic-years');
+
+        // Account approvals
+        Route::get('accounts', [UserApprovalController::class, 'index'])->name('accounts.index');
+        Route::patch('accounts/{user}/approve', [UserApprovalController::class, 'approve'])->name('accounts.approve');
+        Route::patch('accounts/{user}/reject', [UserApprovalController::class, 'reject'])->name('accounts.reject');
     });
 
     // 3. STAFF / UNIT ROUTES
     Route::prefix('my')->name('my.')->middleware('role:staff')->group(function () {
         Route::get('kpis', [UnitKpiController::class, 'index'])->name('kpis');
+         Route::post('kpis/{kpi}/submissions', [UnitKpiController::class, 'storeSubmission'])->name('my.kpis.submissions.store');
         Route::get('action-plans', [UnitActionPlanController::class, 'index'])->name('action-plans');
         Route::get('kpi-submissions', [UnitKpiSubmissionController::class, 'index'])->name('kpi-submissions.index');
         Route::get('reports', [UnitReportController::class, 'index'])->name('reports');

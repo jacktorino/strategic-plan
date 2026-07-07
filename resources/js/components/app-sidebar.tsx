@@ -11,6 +11,7 @@ import {
     LayoutGrid,
     LifeBuoy,
     Target,
+    UserCheck,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -65,6 +66,7 @@ const adminNavItems: NavItem[] = [
     },
     { title: 'Units', href: '/admin/units', icon: Users },
     { title: 'KPI Proposals', href: '/admin/kpi-submissions', icon: FilePlus2 },
+    { title: 'Approve Accounts', href: '/admin/accounts', icon: UserCheck },
     { title: 'Reports & Analytics', href: '/admin/reports', icon: BarChart3 },
     {
         title: 'Academic Years',

@@ -69,12 +69,7 @@ export default function Dashboard({ role, unit, metrics }: Props) {
 // =========================================================================
 function AdminDashboardView({ metrics }: { metrics: any }) {
     // Admin Chart: Overview of Submissions over recent periods
-    const systemActivityData = [
-        { month: 'Jan', submissions: 5 },
-        { month: 'Feb', submissions: 12 },
-        { month: 'Mar', submissions: 18 },
-        { month: 'Apr', submissions: metrics.active_kpis || 24 },
-    ];
+    const systemActivityData = metrics.activity ?? [];
 
     return (
         <div className="space-y-6">
@@ -283,20 +278,10 @@ function StaffDashboardView({ metrics }: { metrics: any }) {
 // 3. EXECUTIVE / PRESIDENT DASHBOARD
 // =========================================================================
 function PresidentDashboardView({ metrics }: { metrics: any }) {
-    const kraPerformanceData = [
-        { name: 'KRA-1: Academics', progress: 85 },
-        { name: 'KRA-2: Research', progress: 62 },
-        { name: 'KRA-3: Extension', progress: 78 },
-        { name: 'KRA-4: Operations', progress: 90 },
-        { name: "KRA-5: Int'lization", progress: 55 },
-    ];
+    const kraPerformanceData = metrics.kra_performance ?? [];
 
-    const unitComplianceData = [
-        { name: 'Completed On-Time', value: 9, color: '#10b981' },
-        { name: 'Pending Review', value: 3, color: '#f59e0b' },
-        { name: 'Delayed Submissions', value: 2, color: '#ef4444' },
-    ];
-
+    const unitComplianceData = metrics.unit_compliance ?? [];
+    const totalUnitsTracked = metrics.total_units_tracked ?? 0;
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
