@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,11 +16,31 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
+        // 1. Create a President User
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'UV President',
+            'email' => 'president@uv.edu.ph',
+            'password' => Hash::make('password'),
+            'role' => 'president',
+            'responsible_unit' => null,
+        ]);
+
+        // 2. Create an Admin User
+        User::factory()->create([
+            'name' => 'System Administrator',
+            'email' => 'admin@uv.edu.ph',
+            'password' => Hash::make('password'),
+            'role' => 'admin',
+            'responsible_unit' => 'Management Information System',
+        ]);
+
+        // 3. Create a Staff / Unit User
+        User::factory()->create([
+            'name' => 'HR Department Head',
+            'email' => 'hr@uv.edu.ph',
+            'password' => Hash::make('password'),
+            'role' => 'staff',
+            'responsible_unit' => 'Human Resources',
         ]);
     }
 }

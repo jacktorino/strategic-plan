@@ -1,3 +1,6 @@
+// resources/js/types/auth.ts
+export type UserRole = 'admin' | 'staff' | 'president';
+
 export type User = {
     id: number;
     name: string;
@@ -7,6 +10,8 @@ export type User = {
     two_factor_enabled?: boolean;
     created_at: string;
     updated_at: string;
+    role: UserRole;
+    responsible_unit: string | null;
     [key: string]: unknown;
 };
 
@@ -31,4 +36,10 @@ export type TwoFactorSetupData = {
 
 export type TwoFactorSecretKey = {
     secretKey: string;
+};
+
+export type SharedData = {
+    auth: Auth;
+    // You can add flash messages or other global shares here later if needed
+    [key: string]: unknown;
 };
