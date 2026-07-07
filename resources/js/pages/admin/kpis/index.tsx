@@ -11,6 +11,7 @@ import {
     Building2,
     Check,
     Search,
+    Lightbulb,
 } from 'lucide-react';
 
 type Props = {
@@ -18,24 +19,51 @@ type Props = {
     selectedAY: string;
 };
 
-// 🌟 Configured list of University of the Visayas offices/departments
-const UNIVERSITY_UNITS = [
-    'College of Information Technology',
-    'College of Engineering & Architecture',
-    'College of Management, Business & Accountancy',
-    'College of Arts & Sciences',
-    'College of Criminal Justice',
-    'College of Education',
-    'College of Nursing',
-    'Graduate School',
-    'Human Resource Department',
-    "Registrar's Office",
-    'Finance and Accounting Office',
-    'Research and Development Unit',
-    'Quality Assurance & Accreditation Office',
-    'Student Affairs Office',
-    'Community Extension Services Office',
-];
+// 🌟 Responsible units grouped by category, mirroring the University's
+// organizational structure. Each Innovative Action Plan can be assigned to
+// specific units within a group, OR to an entire group at once (e.g. "All
+// Academic Units").
+const RESPONSIBLE_UNIT_GROUPS: Record<string, string[]> = {
+    'Academic Units': [
+        'CAHS',
+        'CAS',
+        'CBA',
+        'CCJE',
+        'COED',
+        'CETA',
+        'COME',
+        'GLS',
+    ],
+    'Academic Support': [
+        'CPAD',
+        'QMSO',
+        'FMD',
+        'ICTD',
+        'FAD',
+        'HRD',
+        'CRI',
+        'COMEX',
+        'IAD',
+        'SASC',
+        'ARC',
+        'ACD',
+        'CIE',
+        'DPIA',
+        'IQA',
+        'CPARC',
+        'SRMD',
+        'SSD',
+        'CTESD',
+    ],
+    'Satellite Campuses': ['PARDO', 'MINGLANILLA', 'TOLEDO', 'DALAGUETE'],
+};
+
+const groupAllLabel = (group: string) => `All ${group}`;
+
+type ActionPlanForm = {
+    description: string;
+    responsible_units: string[];
+};
 
 export default function AdminKpis({ kras, selectedAY }: Props) {
     const [isOpen, setIsOpen] = useState(false);
@@ -44,10 +72,17 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
     });
     const [selectedKra, setSelectedKra] = useState<any>(null);
 
-    // Custom Select Dropdown UI state variables
-    const [isSelectOpen, setIsSelectOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    // 🌟 Custom "Select with Options" state for the Academic Year filter
+    const [isAYSelectOpen, setIsAYSelectOpen] = useState(false);
+    const ayDropdownRef = useRef<HTMLDivElement>(null);
+
+    // 🌟 Per-action-plan Responsible Unit(s) multi-select dropdown state.
+    // Only one row's dropdown is open at a time, tracked by its index.
+    const [openUnitDropdownIndex, setOpenUnitDropdownIndex] = useState<
+        number | null
+    >(null);
+    const [unitSearchQuery, setUnitSearchQuery] = useState('');
+    const unitDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
     const academicYears = [
         '2023-2024',
@@ -63,29 +98,47 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
             kra_id: '',
             code: '',
             name: '',
-            responsible_unit: '',
-            target_2027: '100%',
-            target_2028: '100%',
-            target_2029: '100%',
+            // 🌟 Each Innovative Action Plan carries its own responsible
+            // unit(s) — a KPI can have multiple action plans, and each one
+            // can be assigned to specific units or to an entire group.
+            action_plans: [
+                { description: '', responsible_units: [] },
+            ] as ActionPlanForm[],
         });
 
-    // Close custom selector on outside click
+    // Close custom selectors on outside click
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(event.target as Node)
+                ayDropdownRef.current &&
+                !ayDropdownRef.current.contains(event.target as Node)
             ) {
-                setIsSelectOpen(false);
+                setIsAYSelectOpen(false);
+            }
+            if (
+                openUnitDropdownIndex !== null &&
+                unitDropdownRefs.current[openUnitDropdownIndex] &&
+                !unitDropdownRefs.current[openUnitDropdownIndex]!.contains(
+                    event.target as Node,
+                )
+            ) {
+                setOpenUnitDropdownIndex(null);
+                setUnitSearchQuery('');
             }
         }
         document.addEventListener('mousedown', handleClickOutside);
         return () =>
             document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [openUnitDropdownIndex]);
 
     const handleAYChange = (year: string) => {
         router.get('/admin/kpis', { ay: year }, { preserveState: true });
+        setIsAYSelectOpen(false);
+    };
+
+    const getAYStatusLabel = (ay: string) => {
+        if (ay === '2026-2027') return '(Active)';
+        return ay < '2026-2027' ? '(Completed)' : '(Future)';
     };
 
     const openCreateModal = (kra: any) => {
@@ -97,8 +150,8 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
     const closeCreateModal = () => {
         setIsOpen(false);
         setSelectedKra(null);
-        setIsSelectOpen(false);
-        setSearchQuery('');
+        setOpenUnitDropdownIndex(null);
+        setUnitSearchQuery('');
         reset();
         clearErrors();
     };
@@ -110,17 +163,92 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
         });
     };
 
-    // Filter units based on search input
-    const filteredUnits = UNIVERSITY_UNITS.filter((unit) =>
-        unit.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    // 🌟 Innovative Action Plan list helpers (add / update / remove rows)
+    const addActionPlan = () => {
+        setData('action_plans', [
+            ...data.action_plans,
+            { description: '', responsible_units: [] },
+        ]);
+    };
+
+    const updateActionPlanDescription = (index: number, value: string) => {
+        const updated = [...data.action_plans];
+        updated[index] = { ...updated[index], description: value };
+        setData('action_plans', updated);
+    };
+
+    const removeActionPlan = (index: number) => {
+        if (data.action_plans.length === 1) {
+            // Always keep at least one row visible
+            setData('action_plans', [
+                { description: '', responsible_units: [] },
+            ]);
+            return;
+        }
+        setData(
+            'action_plans',
+            data.action_plans.filter((_, i) => i !== index),
+        );
+        setOpenUnitDropdownIndex(null);
+    };
+
+    // Toggle a single specific unit for a given action plan. Selecting a
+    // specific unit clears that group's "All {Group}" marker, since the
+    // assignment is no longer "the whole group".
+    const toggleActionPlanUnit = (
+        index: number,
+        group: string,
+        unit: string,
+    ) => {
+        const allLabel = groupAllLabel(group);
+        const updated = [...data.action_plans];
+        const current = updated[index].responsible_units;
+        const next = current.includes(unit)
+            ? current.filter((u) => u !== unit)
+            : [...current.filter((u) => u !== allLabel), unit];
+        updated[index] = { ...updated[index], responsible_units: next };
+        setData('action_plans', updated);
+    };
+
+    // Toggle assigning an entire group ("All Academic Units", etc.) to a
+    // given action plan. Selecting the whole group clears any individually
+    // selected units from that same group.
+    const toggleActionPlanGroup = (index: number, group: string) => {
+        const allLabel = groupAllLabel(group);
+        const groupUnits = RESPONSIBLE_UNIT_GROUPS[group];
+        const updated = [...data.action_plans];
+        const current = updated[index].responsible_units;
+        const isAllSelected = current.includes(allLabel);
+        const next = isAllSelected
+            ? current.filter((u) => u !== allLabel)
+            : [...current.filter((u) => !groupUnits.includes(u)), allLabel];
+        updated[index] = { ...updated[index], responsible_units: next };
+        setData('action_plans', updated);
+    };
+
+    // Filter the grouped unit list per the active search query
+    const getFilteredGroups = () => {
+        const query = unitSearchQuery.toLowerCase();
+        if (!query) return RESPONSIBLE_UNIT_GROUPS;
+        const filtered: Record<string, string[]> = {};
+        Object.entries(RESPONSIBLE_UNIT_GROUPS).forEach(([group, units]) => {
+            const groupMatches = group.toLowerCase().includes(query);
+            const matchingUnits = units.filter((u) =>
+                u.toLowerCase().includes(query),
+            );
+            if (groupMatches || matchingUnits.length > 0) {
+                filtered[group] = groupMatches ? units : matchingUnits;
+            }
+        });
+        return filtered;
+    };
 
     return (
         <>
             <Head title={`Admin | KPI Management (${selectedAY})`} />
-            <div className="mx-auto max-w-7xl space-y-6 p-6">
+            <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
                 {/* Dashboard Action Header layout */}
-                <div className="flex flex-col gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-gray-900">
                             <Target className="h-6 w-6 text-green-600" />
@@ -132,32 +260,56 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
                         </p>
                     </div>
 
-                    {/* Academic Calendar Target Filter */}
-                    <div className="flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 shadow-inner sm:self-center">
-                        <Calendar className="h-4 w-4 text-green-600" />
-                        <label
-                            htmlFor="ay-select"
-                            className="text-xs font-bold tracking-wide whitespace-nowrap text-gray-500 uppercase"
+                    {/* Academic Calendar Target Filter — custom Select w/ Options */}
+                    <div
+                        className="relative self-start sm:self-center"
+                        ref={ayDropdownRef}
+                    >
+                        <div
+                            onClick={() => setIsAYSelectOpen(!isAYSelectOpen)}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 shadow-inner transition-colors hover:border-green-600/40"
                         >
-                            Academic Year:
-                        </label>
-                        <select
-                            id="ay-select"
-                            value={selectedAY}
-                            onChange={(e) => handleAYChange(e.target.value)}
-                            className="cursor-pointer border-none bg-transparent text-sm font-bold text-gray-800 focus:outline-none"
-                        >
-                            {academicYears.map((ay) => (
-                                <option key={ay} value={ay}>
-                                    AY {ay}{' '}
-                                    {ay === '2026-2027'
-                                        ? '(Active)'
-                                        : ay < '2026-2027'
-                                          ? '(Completed)'
-                                          : '(Future)'}
-                                </option>
-                            ))}
-                        </select>
+                            <Calendar className="h-4 w-4 shrink-0 text-green-600" />
+                            <span className="text-xs font-bold tracking-wide whitespace-nowrap text-gray-500 uppercase">
+                                Academic Year:
+                            </span>
+                            <span className="text-sm font-bold whitespace-nowrap text-gray-800">
+                                AY {selectedAY} {getAYStatusLabel(selectedAY)}
+                            </span>
+                            <ChevronDown
+                                className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${isAYSelectOpen ? 'rotate-180 transform' : ''}`}
+                            />
+                        </div>
+
+                        {/* Options panel */}
+                        {isAYSelectOpen && (
+                            <div className="absolute right-0 z-50 mt-1 flex w-56 animate-in flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl duration-100 fade-in slide-in-from-top-1">
+                                {academicYears.map((ay) => {
+                                    const isSelected = selectedAY === ay;
+                                    return (
+                                        <div
+                                            key={ay}
+                                            onClick={() => handleAYChange(ay)}
+                                            className={`flex cursor-pointer items-center justify-between px-4 py-2.5 text-xs font-semibold transition-colors ${
+                                                isSelected
+                                                    ? 'bg-green-50 text-green-700'
+                                                    : 'text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <span>
+                                                AY {ay}{' '}
+                                                <span className="font-normal text-gray-400">
+                                                    {getAYStatusLabel(ay)}
+                                                </span>
+                                            </span>
+                                            {isSelected && (
+                                                <Check className="h-3.5 w-3.5 shrink-0 stroke-[3] text-green-600" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -225,11 +377,13 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
                                                         Code
                                                     </th>
                                                     <th className="p-3">
-                                                        Performance Measurement
-                                                        Target Requirement
+                                                        KEY PERFORMANCE
+                                                        INDICATOR
                                                     </th>
-                                                    <th className="w-48 p-3">
-                                                        Responsible Unit
+                                                    <th className="w-80 p-3">
+                                                        Innovative Action Plan
+                                                        &amp; Responsible
+                                                        Unit(s)
                                                     </th>
                                                     <th className="w-36 p-3 text-center">
                                                         Monthly Progress (
@@ -270,11 +424,13 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
                                                                                     0,
                                                                                     3,
                                                                                 )}
+
                                                                                 :{' '}
                                                                                 <strong className="text-gray-900">
                                                                                     {
                                                                                         sub.compliance_percentage
                                                                                     }
+
                                                                                     %
                                                                                 </strong>
                                                                             </span>
@@ -283,14 +439,75 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
                                                                 </div>
                                                             </td>
                                                             <td className="p-3 align-middle">
-                                                                <span className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-sm">
-                                                                    <Building2 className="h-3 w-3 shrink-0 text-gray-400" />
-                                                                    {kpi.responsible_unit || (
-                                                                        <span className="font-normal text-gray-400 italic">
-                                                                            Unassigned
-                                                                        </span>
-                                                                    )}
-                                                                </span>
+                                                                {kpi.action_plans &&
+                                                                kpi.action_plans
+                                                                    .length >
+                                                                    0 ? (
+                                                                    <div className="space-y-2.5">
+                                                                        {kpi.action_plans.map(
+                                                                            (
+                                                                                plan: any,
+                                                                                idx: number,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        plan.id ??
+                                                                                        idx
+                                                                                    }
+                                                                                    className="space-y-1"
+                                                                                >
+                                                                                    <p className="text-[11px] leading-relaxed text-gray-700">
+                                                                                        <span className="font-bold text-gray-400">
+                                                                                            {idx +
+                                                                                                1}
+
+                                                                                            .
+                                                                                        </span>{' '}
+                                                                                        {
+                                                                                            plan.description
+                                                                                        }
+                                                                                    </p>
+                                                                                    <div className="flex flex-wrap gap-1 pl-3.5">
+                                                                                        {plan.responsible_units &&
+                                                                                        plan
+                                                                                            .responsible_units
+                                                                                            .length >
+                                                                                            0 ? (
+                                                                                            plan.responsible_units.map(
+                                                                                                (
+                                                                                                    unit: string,
+                                                                                                ) => (
+                                                                                                    <span
+                                                                                                        key={
+                                                                                                            unit
+                                                                                                        }
+                                                                                                        className="inline-flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600"
+                                                                                                    >
+                                                                                                        <Building2 className="h-2.5 w-2.5 shrink-0 text-gray-400" />
+                                                                                                        {
+                                                                                                            unit
+                                                                                                        }
+                                                                                                    </span>
+                                                                                                ),
+                                                                                            )
+                                                                                        ) : (
+                                                                                            <span className="text-[10px] font-normal text-gray-400 italic">
+                                                                                                Unassigned
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[11px] font-normal text-gray-400 italic">
+                                                                        No
+                                                                        action
+                                                                        plan
+                                                                        submitted.
+                                                                    </span>
+                                                                )}
                                                             </td>
                                                             <td className="p-3 text-center align-middle">
                                                                 <div className="flex flex-col items-center justify-center">
@@ -426,188 +643,313 @@ export default function AdminKpis({ kras, selectedAY }: Props) {
                                     )}
                                 </div>
 
-                                {/* 🌟 SEARCHABLE SEARCH ENGINE SELECT COMPONENT */}
-                                <div
-                                    className="relative space-y-1"
-                                    ref={dropdownRef}
-                                >
-                                    <label className="text-xs font-bold tracking-wider text-gray-500 uppercase">
-                                        Responsible Unit / Department
-                                    </label>
-
-                                    {/* Trigger Display Area box */}
-                                    <div
-                                        onClick={() =>
-                                            setIsSelectOpen(!isSelectOpen)
-                                        }
-                                        className={`flex w-full cursor-pointer items-center justify-between rounded-lg border bg-white px-3 py-2.5 text-sm shadow-sm focus:border-green-600 focus:ring-2 focus:ring-green-500/20 ${
-                                            errors.responsible_unit
-                                                ? 'border-red-500'
-                                                : 'border-gray-300'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2 text-gray-800">
-                                            <Building2 className="h-4 w-4 text-gray-400" />
-                                            <span
-                                                className={
-                                                    data.responsible_unit
-                                                        ? 'font-medium'
-                                                        : 'text-gray-400'
-                                                }
-                                            >
-                                                {data.responsible_unit ||
-                                                    'Select internal department area...'}
-                                            </span>
-                                        </div>
-                                        <ChevronDown
-                                            className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isSelectOpen ? 'rotate-180 transform' : ''}`}
-                                        />
+                                {/* 🌟 Repeatable Innovative Action Plan rows.
+                                     Each row has its own description AND its
+                                     own Responsible Unit(s) multi-select —
+                                     assignable to specific units, or to an
+                                     entire group ("All Academic Units", "All
+                                     Academic Support", "All Satellite
+                                     Campuses"). Manual per-year (100%)
+                                     targets are no longer entered here —
+                                     compliance is computed from each
+                                     responsible unit's submissions. */}
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-gray-500 uppercase">
+                                            <Lightbulb className="h-3.5 w-3.5 text-green-600" />
+                                            Innovative Action Plan
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={addActionPlan}
+                                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-[10px] font-bold text-gray-600 transition-colors hover:border-green-600 hover:text-green-600"
+                                        >
+                                            <Plus className="h-3 w-3 stroke-[3]" />
+                                            Add Plan
+                                        </button>
                                     </div>
 
-                                    {/* Animated Option Selector Dropdown Panel list item overlay */}
-                                    {isSelectOpen && (
-                                        <div className="absolute z-50 mt-1 flex max-h-60 w-full animate-in flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl duration-100 fade-in slide-in-from-top-1">
-                                            {/* Nested Filter Searchbar */}
-                                            <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2">
-                                                <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Filter departments..."
-                                                    value={searchQuery}
-                                                    onChange={(e) =>
-                                                        setSearchQuery(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full border-none bg-transparent p-0 text-xs font-medium text-gray-700 focus:ring-0 focus:outline-none"
-                                                />
-                                                {searchQuery && (
-                                                    <X
-                                                        onClick={() =>
-                                                            setSearchQuery('')
-                                                        }
-                                                        className="h-3 w-3 cursor-pointer text-gray-400 hover:text-gray-600"
-                                                    />
-                                                )}
-                                            </div>
+                                    <div className="space-y-4">
+                                        {data.action_plans.map(
+                                            (plan, index) => {
+                                                const isUnitDropdownOpen =
+                                                    openUnitDropdownIndex ===
+                                                    index;
+                                                const filteredGroups =
+                                                    isUnitDropdownOpen
+                                                        ? getFilteredGroups()
+                                                        : {};
 
-                                            {/* Listed elements stack */}
-                                            <div className="flex-1 divide-y divide-gray-50 overflow-y-auto">
-                                                {filteredUnits.length > 0 ? (
-                                                    filteredUnits.map(
-                                                        (unit) => {
-                                                            const isSelected =
-                                                                data.responsible_unit ===
-                                                                unit;
-                                                            return (
-                                                                <div
-                                                                    key={unit}
-                                                                    onClick={() => {
-                                                                        setData(
-                                                                            'responsible_unit',
-                                                                            unit,
-                                                                        );
-                                                                        setIsSelectOpen(
-                                                                            false,
-                                                                        );
-                                                                        setSearchQuery(
-                                                                            '',
-                                                                        );
-                                                                    }}
-                                                                    className={`flex cursor-pointer items-center justify-between px-4 py-2.5 text-xs font-semibold transition-colors ${
-                                                                        isSelected
-                                                                            ? 'bg-green-50 text-green-700'
-                                                                            : 'text-gray-700 hover:bg-gray-50'
-                                                                    }`}
-                                                                >
-                                                                    <span>
-                                                                        {unit}
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/40 p-3"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <span className="mt-1.5 text-[10px] font-black text-gray-400">
+                                                                #{index + 1}
+                                                            </span>
+                                                            <textarea
+                                                                rows={2}
+                                                                placeholder={`Action plan #${index + 1}...`}
+                                                                value={
+                                                                    plan.description
+                                                                }
+                                                                onChange={(e) =>
+                                                                    updateActionPlanDescription(
+                                                                        index,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={`w-full resize-none rounded-lg border bg-white px-3 py-2 text-sm shadow-sm focus:border-green-600 focus:ring-2 focus:ring-green-500/20 focus:outline-none ${
+                                                                    (
+                                                                        errors as any
+                                                                    )[
+                                                                        `action_plans.${index}.description`
+                                                                    ]
+                                                                        ? 'border-red-500 focus:ring-red-500/20'
+                                                                        : 'border-gray-300'
+                                                                }`}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    removeActionPlan(
+                                                                        index,
+                                                                    )
+                                                                }
+                                                                className="mt-1 shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                                                                title="Remove this action plan"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+
+                                                        {/* 🌟 Per-plan Responsible Unit(s) multi-select */}
+                                                        <div
+                                                            className="relative"
+                                                            ref={(el) => {
+                                                                unitDropdownRefs.current[
+                                                                    index
+                                                                ] = el;
+                                                            }}
+                                                        >
+                                                            <div
+                                                                onClick={() => {
+                                                                    setOpenUnitDropdownIndex(
+                                                                        isUnitDropdownOpen
+                                                                            ? null
+                                                                            : index,
+                                                                    );
+                                                                    setUnitSearchQuery(
+                                                                        '',
+                                                                    );
+                                                                }}
+                                                                className={`flex min-h-[38px] w-full cursor-pointer flex-wrap items-center gap-1 rounded-lg border bg-white px-2.5 py-1.5 text-xs shadow-sm ${
+                                                                    (
+                                                                        errors as any
+                                                                    )[
+                                                                        `action_plans.${index}.responsible_units`
+                                                                    ]
+                                                                        ? 'border-red-500'
+                                                                        : 'border-gray-300'
+                                                                }`}
+                                                            >
+                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                                                                {plan
+                                                                    .responsible_units
+                                                                    .length ===
+                                                                0 ? (
+                                                                    <span className="text-gray-400">
+                                                                        Assign
+                                                                        responsible
+                                                                        unit(s)...
                                                                     </span>
-                                                                    {isSelected && (
-                                                                        <Check className="h-3.5 w-3.5 stroke-[3] text-green-600" />
-                                                                    )}
+                                                                ) : (
+                                                                    plan.responsible_units.map(
+                                                                        (
+                                                                            unit,
+                                                                        ) => (
+                                                                            <span
+                                                                                key={
+                                                                                    unit
+                                                                                }
+                                                                                className="inline-flex items-center gap-1 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-bold text-green-700"
+                                                                            >
+                                                                                {
+                                                                                    unit
+                                                                                }
+                                                                            </span>
+                                                                        ),
+                                                                    )
+                                                                )}
+                                                                <ChevronDown
+                                                                    className={`ml-auto h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform duration-200 ${isUnitDropdownOpen ? 'rotate-180 transform' : ''}`}
+                                                                />
+                                                            </div>
+
+                                                            {isUnitDropdownOpen && (
+                                                                <div className="absolute z-50 mt-1 flex max-h-72 w-full animate-in flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl duration-100 fade-in slide-in-from-top-1">
+                                                                    <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2">
+                                                                        <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Filter units or groups..."
+                                                                            value={
+                                                                                unitSearchQuery
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setUnitSearchQuery(
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            className="w-full border-none bg-transparent p-0 text-xs font-medium text-gray-700 focus:ring-0 focus:outline-none"
+                                                                        />
+                                                                        {unitSearchQuery && (
+                                                                            <X
+                                                                                onClick={() =>
+                                                                                    setUnitSearchQuery(
+                                                                                        '',
+                                                                                    )
+                                                                                }
+                                                                                className="h-3 w-3 cursor-pointer text-gray-400 hover:text-gray-600"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex-1 divide-y divide-gray-50 overflow-y-auto">
+                                                                        {Object.keys(
+                                                                            filteredGroups,
+                                                                        )
+                                                                            .length ===
+                                                                        0 ? (
+                                                                            <div className="p-4 text-center text-xs font-medium text-gray-400 italic">
+                                                                                No
+                                                                                units
+                                                                                match
+                                                                                search
+                                                                                filter
+                                                                                terms.
+                                                                            </div>
+                                                                        ) : (
+                                                                            Object.entries(
+                                                                                filteredGroups,
+                                                                            ).map(
+                                                                                ([
+                                                                                    group,
+                                                                                    units,
+                                                                                ]) => {
+                                                                                    const allLabel =
+                                                                                        groupAllLabel(
+                                                                                            group,
+                                                                                        );
+                                                                                    const isGroupSelected =
+                                                                                        plan.responsible_units.includes(
+                                                                                            allLabel,
+                                                                                        );
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={
+                                                                                                group
+                                                                                            }
+                                                                                        >
+                                                                                            <div
+                                                                                                onClick={() =>
+                                                                                                    toggleActionPlanGroup(
+                                                                                                        index,
+                                                                                                        group,
+                                                                                                    )
+                                                                                                }
+                                                                                                className={`flex cursor-pointer items-center justify-between px-4 py-2 text-[11px] font-black tracking-wide uppercase transition-colors ${
+                                                                                                    isGroupSelected
+                                                                                                        ? 'bg-green-50 text-green-700'
+                                                                                                        : 'bg-gray-50/70 text-gray-500 hover:bg-gray-100'
+                                                                                                }`}
+                                                                                            >
+                                                                                                <span>
+                                                                                                    {
+                                                                                                        allLabel
+                                                                                                    }
+                                                                                                </span>
+                                                                                                {isGroupSelected && (
+                                                                                                    <Check className="h-3.5 w-3.5 stroke-[3] text-green-600" />
+                                                                                                )}
+                                                                                            </div>
+                                                                                            {units.map(
+                                                                                                (
+                                                                                                    unit,
+                                                                                                ) => {
+                                                                                                    const isSelected =
+                                                                                                        plan.responsible_units.includes(
+                                                                                                            unit,
+                                                                                                        );
+                                                                                                    return (
+                                                                                                        <div
+                                                                                                            key={
+                                                                                                                unit
+                                                                                                            }
+                                                                                                            onClick={() =>
+                                                                                                                toggleActionPlanUnit(
+                                                                                                                    index,
+                                                                                                                    group,
+                                                                                                                    unit,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            className={`flex cursor-pointer items-center justify-between py-2 pr-4 pl-6 text-xs font-semibold transition-colors ${
+                                                                                                                isSelected
+                                                                                                                    ? 'bg-green-50/60 text-green-700'
+                                                                                                                    : 'text-gray-700 hover:bg-gray-50'
+                                                                                                            }`}
+                                                                                                        >
+                                                                                                            <span>
+                                                                                                                {
+                                                                                                                    unit
+                                                                                                                }
+                                                                                                            </span>
+                                                                                                            {isSelected && (
+                                                                                                                <Check className="h-3.5 w-3.5 stroke-[3] text-green-600" />
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                },
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                },
+                                                                            )
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            );
-                                                        },
-                                                    )
-                                                ) : (
-                                                    <div className="p-4 text-center text-xs font-medium text-gray-400 italic">
-                                                        No units match search
-                                                        filter terms.
+                                                            )}
+                                                        </div>
+                                                        {(errors as any)[
+                                                            `action_plans.${index}.responsible_units`
+                                                        ] && (
+                                                            <p className="text-xs font-medium text-red-500">
+                                                                {
+                                                                    (
+                                                                        errors as any
+                                                                    )[
+                                                                        `action_plans.${index}.responsible_units`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {errors.responsible_unit && (
-                                        <p className="mt-1 text-xs font-medium text-red-500">
-                                            {errors.responsible_unit}
+                                                );
+                                            },
+                                        )}
+                                    </div>
+                                    {(errors as any).action_plans && (
+                                        <p className="text-xs font-medium text-red-500">
+                                            {(errors as any).action_plans}
                                         </p>
                                     )}
-                                </div>
-
-                                {/* Target Year Horizons Row */}
-                                <div className="grid grid-cols-3 gap-3 pt-2">
-                                    <div className="space-y-1">
-                                        <label
-                                            htmlFor="target_2027"
-                                            className="text-[10px] font-bold tracking-wider text-gray-400 uppercase"
-                                        >
-                                            AY 2026-27
-                                        </label>
-                                        <input
-                                            id="target_2027"
-                                            type="text"
-                                            value={data.target_2027}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'target_2027',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center font-mono text-xs font-semibold focus:border-green-600 focus:outline-none"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label
-                                            htmlFor="target_2028"
-                                            className="text-[10px] font-bold tracking-wider text-gray-400 uppercase"
-                                        >
-                                            AY 2027-28
-                                        </label>
-                                        <input
-                                            id="target_2028"
-                                            type="text"
-                                            value={data.target_2028}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'target_2028',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center font-mono text-xs font-semibold focus:border-green-600 focus:outline-none"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label
-                                            htmlFor="target_2029"
-                                            className="text-[10px] font-bold tracking-wider text-gray-400 uppercase"
-                                        >
-                                            AY 2028-29
-                                        </label>
-                                        <input
-                                            id="target_2029"
-                                            type="text"
-                                            value={data.target_2029}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'target_2029',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-center font-mono text-xs font-semibold focus:border-green-600 focus:outline-none"
-                                        />
-                                    </div>
                                 </div>
                             </div>
 
