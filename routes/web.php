@@ -61,7 +61,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('my')->name('my.')->middleware('role:staff')->group(function () {
         Route::get('kpis', [UnitKpiController::class, 'index'])->name('kpis');
         Route::get('action-plans', [UnitActionPlanController::class, 'index'])->name('action-plans');
-        Route::get('kpi-submissions/create', [UnitKpiSubmissionController::class, 'create'])->name('kpi-submissions.create');
+        Route::get('kpi-submissions', [UnitKpiSubmissionController::class, 'index'])->name('kpi-submissions.index');
         Route::get('reports', [UnitReportController::class, 'index'])->name('reports');
     });
 });
