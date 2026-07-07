@@ -4,19 +4,36 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Inertia\Response;
-use App\Models\Kra;
 
 class AdminKraController extends Controller
 {
-    /**
-     * Display a listing of Key Result Areas.
-     */
-    public function index(): Response
+    public function index()
     {
+        $kras = DB::table('kras')->orderBy('code', 'asc')->get();
+
         return Inertia::render('admin/kras/index', [
-            'kras' => Kra::all(), // Passing data directly down to React
+            'kras' => $kras
         ]);
     }
+
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'code' => 'required|string|unique:kras,code',
+        'title' => 'required|string|max:255', // 🌟 Changed from name to title
+        'description' => 'nullable|string',
+    ]);
+
+    DB::table('kras')->insert([
+        'code' => $validated['code'],
+        'title' => $validated['title'], // 🌟 Changed from name to title
+        'description' => $validated['description'],
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return redirect()->back()->with('success', 'KRA created successfully.');
+}
 }

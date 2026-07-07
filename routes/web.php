@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // 1. PRESIDENT ROUTES
     Route::middleware('role:president')->group(function () {
+      
         Route::get('kras', [KraController::class, 'index'])->name('kras.index');
         Route::get('kpis', [KpiController::class, 'index'])->name('kpis.index');
         Route::get('action-plans', [ActionPlanController::class, 'index'])->name('action-plans.index');
@@ -46,7 +47,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 2. ADMIN ROUTES
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('kras', [AdminKraController::class, 'index'])->name('kras');
+        Route::post('/kras', [AdminKraController::class, 'store'])->name('kras.store');
         Route::get('kpis', [AdminKpiController::class, 'index'])->name('kpis');
+        Route::post('/kpis', [AdminKpiController::class, 'store'])->name('kpis.store');
         Route::get('action-plans', [AdminActionPlanController::class, 'index'])->name('action-plans');
         Route::get('units', [AdminUnitController::class, 'index'])->name('units');
         Route::get('kpi-submissions', [AdminSubmissionController::class, 'index'])->name('kpi-submissions');
