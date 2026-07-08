@@ -22,7 +22,7 @@ export default function Login({ status, canResetPassword }: Props) {
     return (
         <>
             {' '}
-            <Card className="p-7">
+            <Card className="p-7 shadow-xl">
                 <Head title="Log in" />
 
                 {/* <PasskeyVerify /> */}
@@ -45,7 +45,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                         autoFocus
                                         tabIndex={1}
                                         autoComplete="email"
-                                        placeholder="juandelacruz@uv.edu.ph"
+                                        placeholder="email@gmail.com"
                                     />
                                     <InputError message={errors.email} />
                                 </div>

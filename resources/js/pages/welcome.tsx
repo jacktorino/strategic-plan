@@ -1,128 +1,121 @@
-import { Head, Link, usePage } from '@inertiajs/react';
-import { dashboard, login, register } from '@/routes';
+// resources/js/pages/welcome.tsx
+import { Form, Head } from '@inertiajs/react';
+import InputError from '@/components/input-error';
+import PasswordInput from '@/components/password-input';
+import TextLink from '@/components/text-link';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { Card } from '@/components/ui/card';
+import { register } from '@/routes';
+import { store } from '@/routes/login';
+import { request } from '@/routes/password';
+import AuthLayout from '@/layouts/auth-layout';
 
-export default function Welcome() {
-    const { auth } = usePage().props;
+type Props = {
+    status?: string;
+    canResetPassword: boolean;
+};
 
+export default function Welcome({ status, canResetPassword }: Props) {
     return (
-        <>
-            <Head title="Strategic Plan Monitor">
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link
-                    rel="preconnect"
-                    href="https://fonts.gstatic.com"
-                    crossOrigin="anonymous"
-                />
-                <link
-                    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,560;9..144,650&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-                    rel="stylesheet"
-                />
-            </Head>
+        <AuthLayout
+            title="Log in to your account"
+            description="Enter your email and password below to log in"
+        >
+            <Head title="Log in" />
 
-            <div
-                className="flex min-h-screen flex-col bg-[#F6F4EE] text-[#12231B]"
-                style={{
-                    fontFamily:
-                        "'Public Sans', ui-sans-serif, system-ui, sans-serif",
-                }}
-            >
-                {/* Header */}
-                <header className="border-b border-[#DAD6C8]">
-                    <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 lg:px-10">
-                        <div className="flex items-center gap-3">
-                            <div
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E3B27] text-[13px] font-semibold text-[#F6F4EE]"
-                                style={{
-                                    fontFamily: "'IBM Plex Mono', monospace",
-                                }}
-                            >
-                                UV
+            <Card className="p-7 shadow-xl">
+                <Form
+                    {...store.form()}
+                    resetOnSuccess={['password']}
+                    className="flex flex-col gap-6"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <div className="grid gap-6">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email">Email address</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        required
+                                        autoFocus
+                                        tabIndex={1}
+                                        autoComplete="email"
+                                        placeholder="email@gmail.com"
+                                    />
+                                    <InputError message={errors.email} />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <div className="flex items-center">
+                                        <Label htmlFor="password">
+                                            Password
+                                        </Label>
+                                        {canResetPassword && (
+                                            <TextLink
+                                                href={request()}
+                                                className="ml-auto text-sm"
+                                                tabIndex={5}
+                                            >
+                                                Forgot your password?
+                                            </TextLink>
+                                        )}
+                                    </div>
+                                    <PasswordInput
+                                        id="password"
+                                        name="password"
+                                        required
+                                        tabIndex={2}
+                                        autoComplete="current-password"
+                                        placeholder="Password"
+                                    />
+                                    <InputError message={errors.password} />
+                                </div>
+
+                                <div className="flex items-center space-x-3">
+                                    <Checkbox
+                                        id="remember"
+                                        name="remember"
+                                        tabIndex={3}
+                                    />
+                                    <Label htmlFor="remember">
+                                        Remember me
+                                    </Label>
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    className="mt-4 w-full"
+                                    tabIndex={4}
+                                    disabled={processing}
+                                    data-test="login-button"
+                                >
+                                    {processing && <Spinner />}
+                                    Log in
+                                </Button>
                             </div>
-                            <div className="leading-tight">
-                                <p className="text-[13px] font-medium">
-                                    University of the Visayas
-                                </p>
-                                <p
-                                    className="text-[11px] tracking-wide text-[#4b5a52] uppercase"
-                                    style={{
-                                        fontFamily:
-                                            "'IBM Plex Mono', monospace",
-                                    }}
-                                >
-                                    Strategic Plan Monitor
-                                </p>
+
+                            <div className="text-center text-sm text-muted-foreground">
+                                Don't have an account?{' '}
+                                <TextLink href={register()} tabIndex={5}>
+                                    Sign up
+                                </TextLink>
                             </div>
-                        </div>
+                        </>
+                    )}
+                </Form>
 
-                        <nav className="flex items-center gap-3 text-sm">
-                            {auth.user ? (
-                                <Link
-                                    href={dashboard()}
-                                    className="rounded-full bg-[#0E3B27] px-5 py-2 font-medium text-[#F6F4EE] transition-colors hover:bg-[#2F7A4F]"
-                                >
-                                    Go to dashboard
-                                </Link>
-                            ) : (
-                                <>
-                                    <Link
-                                        href={login()}
-                                        className="rounded-full border border-[#0E3B27]/25 px-5 py-2 font-medium transition-colors hover:border-[#0E3B27]/60"
-                                    >
-                                        Log in
-                                    </Link>
-                                    <Link
-                                        href={register()}
-                                        className="rounded-full bg-[#0E3B27] px-5 py-2 font-medium text-[#F6F4EE] transition-colors hover:bg-[#2F7A4F]"
-                                    >
-                                        Register
-                                    </Link>
-                                </>
-                            )}
-                        </nav>
+                {status && (
+                    <div className="mt-4 text-center text-sm font-medium text-green-600">
+                        {status}
                     </div>
-                </header>
-
-                {/* Hero */}
-                <main className="mx-auto flex max-w-6xl flex-1 items-center px-6 lg:px-10">
-                    <div className="max-w-xl">
-                        <p
-                            className="mb-4 text-[12px] tracking-[0.14em] text-[#2F7A4F] uppercase"
-                            style={{
-                                fontFamily: "'IBM Plex Mono', monospace",
-                            }}
-                        >
-                            University of the Visayas
-                        </p>
-                        <h1
-                            className="text-[2.5rem] leading-[1.08] font-medium text-[#0E3B27] lg:text-[3.1rem]"
-                            style={{ fontFamily: "'Fraunces', serif" }}
-                        >
-                            Strategic Plan
-                            <br />
-                            Monitoring System
-                        </h1>
-                        <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[#3c4a43]">
-                            Sign in to view and manage your unit's progress
-                            against the university's strategic plan.
-                        </p>
-
-                        <div className="mt-8 flex items-center gap-4">
-                            {!auth.user && (
-                                <Link
-                                    href={login()}
-                                    className="rounded-full bg-[#0E3B27] px-6 py-3 text-sm font-medium text-[#F6F4EE] transition-colors hover:bg-[#2F7A4F]"
-                                >
-                                    Log in to your dashboard
-                                </Link>
-                            )}
-                        </div>
-                    </div>
-                </main>
-
-                <footer className="border-t border-[#DAD6C8] px-6 py-6 text-center text-[12px] text-[#8a948d] lg:px-10">
-                    University of the Visayas
-                </footer>
-            </div>
-        </>
+                )}
+            </Card>
+        </AuthLayout>
     );
 }
