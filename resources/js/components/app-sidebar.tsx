@@ -164,7 +164,12 @@ function getYearOptions(count = 4): number[] {
 
 // President — read-only, institution-wide oversight
 const presidentNavItems: NavItem[] = [
-    
+    // { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    // { title: 'KPI Tracker', href: '/kpis', icon: Gauge },
+    // { title: 'Action Plans', href: '/action-plans', icon: ClipboardList },
+    // { title: 'Responsible Units', href: '/units', icon: Users },
+    // { title: 'Reports & Analytics', href: '/reports', icon: BarChart3 },
+    // { title: 'Academic Years', href: '/academic-years', icon: CalendarRange },
 ];
 
 // Admin — creates/assigns KPIs and action plans, manages units, approves proposals
