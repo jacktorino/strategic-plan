@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@uv.edu.ph',
             'password' => Hash::make('password'),
             'role' => 'admin',
+            'status' => 'approved',
             'responsible_unit' => 'Management Information System',
         ]);
 
