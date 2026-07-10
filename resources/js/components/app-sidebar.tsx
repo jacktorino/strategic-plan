@@ -2,7 +2,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BarChart3,
-    CalendarDays,
     CalendarRange,
     CheckSquare,
     ChevronRight,
@@ -16,7 +15,6 @@ import {
     UserCheck,
     Users,
 } from 'lucide-react';
-import { useState } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -138,30 +136,6 @@ const keyResultAreas: Kra[] = [
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Monthly progress — lets the president jump to a specific month within a
-// chosen academic/calendar year to see progress as of that point in time.
-// ---------------------------------------------------------------------------
-const MONTH_NAMES = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-];
-
-function getYearOptions(count = 4): number[] {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: count }, (_, i) => currentYear - i);
-}
-
 // President — read-only, institution-wide oversight
 const presidentNavItems: NavItem[] = [
     // { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -216,63 +190,6 @@ function getNavItemsForRole(role: string | undefined): NavItem[] {
         default:
             return presidentNavItems;
     }
-}
-
-// Lets the president pick a year, then jump to any month within it to see
-// progress as of that month (e.g. /reports/monthly?year=2026&month=7).
-function NavMonthlyProgress() {
-    const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
-    const yearOptions = getYearOptions();
-
-    return (
-        <SidebarGroup>
-            <SidebarGroupLabel>Monthly Progress</SidebarGroupLabel>
-            <SidebarMenu>
-                <Collapsible defaultOpen={false} className="group/collapsible">
-                    <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                            <SidebarMenuButton tooltip="Monthly Progress">
-                                <CalendarDays />
-                                <span>Check Progress by Month</span>
-                                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                            </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <div className="px-2 py-1.5">
-                                <label className="mb-1 block text-xs font-medium text-sidebar-foreground/70">
-                                    Year
-                                </label>
-                                <select
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                    className="w-full rounded-md border border-sidebar-border bg-sidebar px-2 py-1 text-sm text-sidebar-foreground"
-                                >
-                                    {yearOptions.map((year) => (
-                                        <option key={year} value={year}>
-                                            {year}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <SidebarMenuSub>
-                                {MONTH_NAMES.map((month, index) => (
-                                    <SidebarMenuSubItem key={month}>
-                                        <SidebarMenuSubButton asChild>
-                                            <Link
-                                                href={`/reports/monthly?year=${selectedYear}&month=${index + 1}`}
-                                            >
-                                                <span>{month}</span>
-                                            </Link>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                ))}
-                            </SidebarMenuSub>
-                        </CollapsibleContent>
-                    </SidebarMenuItem>
-                </Collapsible>
-            </SidebarMenu>
-        </SidebarGroup>
-    );
 }
 
 // Displays each KRA and its responsible areas; each area links to that
@@ -339,7 +256,6 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
-                {isPresident && <NavMonthlyProgress />}
                 {isPresident && <NavKeyResultAreas />}
             </SidebarContent>
 

@@ -17,11 +17,19 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            
+
             // 🌟 Added role and responsible_unit columns
             $table->enum('role', ['admin', 'staff', 'president'])->default('staff');
             $table->string('responsible_unit')->nullable(); // e.g., 'HR', 'IT Department'
-            
+
+            // Account approval workflow: pending | approved | rejected
+            $table->string('status')->default('pending');
+            $table->timestamp('approved_at')->nullable();
+            $table->foreignId('approved_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
             $table->string('avatar')->nullable(); // Optional: added to support your avatar type
             $table->rememberToken();
             $table->timestamps();
