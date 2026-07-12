@@ -27,6 +27,16 @@ import {
     Line,
 } from 'recharts';
 
+// Brand palette (see AuthSplitLayout): forest green primary, brass gold
+// accent, warm paper background. Kept as literals here rather than Tailwind
+// tokens so this file doesn't depend on tailwind.config naming — swap in
+// your theme tokens (e.g. `bg-forest`) if you've already wired those up.
+const BRAND = {
+    forest: '#0E3B27',
+    gold: '#B9902E',
+    paper: '#F6F4EE',
+};
+
 type Props = {
     role: 'admin' | 'staff' | 'president';
     unit: string | null;
@@ -39,10 +49,9 @@ export default function Dashboard({ role, unit, metrics }: Props) {
             <Head title="Dashboard" />
 
             <div className="space-y-6 p-6">
-                {/* Global Welcome Banner */}
                 <div className="flex flex-col gap-1">
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        Dashboard Workspace
+                    <h1 className="font-serif text-3xl font-bold tracking-tight">
+                        Dashboard
                     </h1>
                     <p className="text-sm text-muted-foreground">
                         Logged in as{' '}
@@ -53,7 +62,6 @@ export default function Dashboard({ role, unit, metrics }: Props) {
                     </p>
                 </div>
 
-                {/* Switch Workspace View Based on Guarded Session Role */}
                 {role === 'admin' && <AdminDashboardView metrics={metrics} />}
                 {role === 'staff' && <StaffDashboardView metrics={metrics} />}
                 {role === 'president' && (
@@ -65,59 +73,55 @@ export default function Dashboard({ role, unit, metrics }: Props) {
 }
 
 // =========================================================================
-// 1. SYSTEM ADMINISTRATOR DASHBOARD
+// 1. ADMIN DASHBOARD
 // =========================================================================
 function AdminDashboardView({ metrics }: { metrics: any }) {
-    // Admin Chart: Overview of Submissions over recent periods
     const systemActivityData = metrics.activity ?? [];
 
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Functional Units
-                        </span>
-                        <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {metrics.total_units ?? 0}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Pending Action Proposals
-                        </span>
-                        <FilePlus2 className="h-5 w-5 text-amber-500" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight text-amber-600">
-                        {metrics.pending_proposals ?? 0}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            System Configured KPIs
-                        </span>
-                        <Gauge className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {metrics.active_kpis ?? 0}
-                    </p>
-                </div>
+                <StatCard
+                    label="Units"
+                    value={metrics.total_units ?? 0}
+                    icon={
+                        <Users
+                            className="h-5 w-5"
+                            style={{ color: BRAND.forest }}
+                        />
+                    }
+                />
+                <StatCard
+                    label="Proposals Awaiting Review"
+                    value={metrics.pending_proposals ?? 0}
+                    valueClassName="text-amber-600"
+                    icon={
+                        <FilePlus2
+                            className="h-5 w-5"
+                            style={{ color: BRAND.gold }}
+                        />
+                    }
+                />
+                <StatCard
+                    label="KPIs Being Tracked"
+                    value={metrics.active_kpis ?? 0}
+                    icon={
+                        <Gauge
+                            className="h-5 w-5"
+                            style={{ color: BRAND.forest }}
+                        />
+                    }
+                />
             </div>
 
             <div className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:col-span-2">
                     <div>
-                        <h3 className="text-lg leading-none font-semibold">
-                            System Transaction Flow
+                        <h3 className="font-serif text-lg leading-none font-semibold">
+                            Submission Activity
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                            Tactical metric evaluation changes captured
-                            system-wide.
+                            Monthly submission volume across all units.
                         </p>
                     </div>
                     <div className="h-[240px] w-full pt-4">
@@ -148,14 +152,17 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
                                     className="fill-muted-foreground text-xs"
                                 />
                                 <Tooltip
-                                    formatter={(value) => [value, 'Logs']}
+                                    formatter={(value) => [
+                                        value,
+                                        'Submissions',
+                                    ]}
                                 />
                                 <Line
                                     type="monotone"
                                     dataKey="submissions"
-                                    stroke="#2563eb"
+                                    stroke={BRAND.forest}
                                     strokeWidth={2}
-                                    dot={{ fill: '#2563eb' }}
+                                    dot={{ fill: BRAND.forest }}
                                 />
                             </LineChart>
                         </ResponsiveContainer>
@@ -164,33 +171,40 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
 
                 <div className="flex flex-col justify-between space-y-4 rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-1">
-                        <h3 className="text-md flex items-center gap-2 font-semibold">
-                            <Layers className="h-4 w-4 text-blue-600" />{' '}
-                            Configuration Actions
+                        <h3 className="text-md flex items-center gap-2 font-serif font-semibold">
+                            <Layers
+                                className="h-4 w-4"
+                                style={{ color: BRAND.forest }}
+                            />
+                            Manage
                         </h3>
                         <p className="text-xs text-muted-foreground">
-                            Quick management workflows for database structural
-                            nodes.
+                            Set up KRAs, units, and KPI assignments.
                         </p>
                     </div>
                     <div className="flex flex-col gap-2">
                         <a
                             href="/admin/kras"
-                            className="w-full rounded-lg bg-primary px-3 py-2 text-center text-xs font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+                            className="w-full rounded-lg px-3 py-2 text-center text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: BRAND.forest }}
                         >
-                            Manage Global KRAs
+                            Manage Key Result Areas
                         </a>
                         <a
                             href="/admin/units"
                             className="w-full rounded-lg border bg-secondary px-3 py-2 text-center text-xs font-medium transition-colors hover:bg-muted"
                         >
-                            Directory Assignments
+                            Manage Units
                         </a>
                         <a
                             href="/admin/kpi-submissions"
-                            className="w-full rounded-lg bg-amber-500/10 px-3 py-2 text-center text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/20"
+                            className="w-full rounded-lg px-3 py-2 text-center text-xs font-medium transition-colors"
+                            style={{
+                                backgroundColor: `${BRAND.gold}1A`,
+                                color: BRAND.gold,
+                            }}
                         >
-                            Review Pending Requests (
+                            Review Pending Submissions (
                             {metrics.pending_proposals ?? 0})
                         </a>
                     </div>
@@ -201,72 +215,68 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
 }
 
 // =========================================================================
-// 2. STAFF / DEPARTMENT HEAD DASHBOARD
+// 2. STAFF / UNIT DASHBOARD
 // =========================================================================
 function StaffDashboardView({ metrics }: { metrics: any }) {
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            My Tracked Targets
-                        </span>
-                        <Gauge className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {metrics.my_assigned_kpis ?? 0}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Action Tasks Completed
-                        </span>
-                        <CheckSquare className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight text-emerald-600">
-                        {metrics.completed_tasks ?? 0}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Awaiting Milestones
-                        </span>
+                <StatCard
+                    label="KPIs Assigned to My Unit"
+                    value={metrics.my_assigned_kpis ?? 0}
+                    icon={
+                        <Gauge
+                            className="h-5 w-5"
+                            style={{ color: BRAND.forest }}
+                        />
+                    }
+                />
+                <StatCard
+                    label="Action Plans Completed"
+                    value={metrics.completed_tasks ?? 0}
+                    valueClassName="text-emerald-700"
+                    icon={<CheckSquare className="h-5 w-5 text-emerald-600" />}
+                />
+                <StatCard
+                    label="Still Due This Period"
+                    value={metrics.pending_tasks ?? 0}
+                    icon={
                         <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {metrics.pending_tasks ?? 0}
-                    </p>
-                </div>
+                    }
+                />
             </div>
 
-            <div className="grid items-center gap-6 rounded-xl border bg-muted/30 p-6 md:grid-cols-3">
+            <div
+                className="grid items-center gap-6 rounded-xl border p-6 md:grid-cols-3"
+                style={{ backgroundColor: `${BRAND.paper}` }}
+            >
                 <div className="space-y-2 md:col-span-2">
-                    <h3 className="flex items-center gap-2 text-lg font-semibold">
-                        <ClipboardCheck className="h-5 w-5 text-emerald-600" />{' '}
-                        Strategic Alignment Required
+                    <h3 className="flex items-center gap-2 font-serif text-lg font-semibold">
+                        <ClipboardCheck
+                            className="h-5 w-5"
+                            style={{ color: BRAND.forest }}
+                        />
+                        Report Your Progress
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                        Your functional unit is assigned to update progress
-                        records according to institutional evaluation phases.
-                        Propose structural changes directly to the admin console
-                        if tracking adjustments are needed.
+                        Update your unit's monthly submissions for its assigned
+                        KPIs. If a KPI or target doesn't fit your unit's work,
+                        propose a change and an admin will review it.
                     </p>
                 </div>
                 <div className="flex w-full flex-col gap-2">
                     <a
                         href="/my/kpis"
-                        className="w-full rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+                        className="w-full rounded-lg px-4 py-2.5 text-center text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: BRAND.forest }}
                     >
-                        Log Metric Entries
+                        Update This Month's Progress
                     </a>
                     <a
                         href="/my/kpi-submissions/create"
                         className="w-full rounded-lg border bg-secondary px-4 py-2.5 text-center text-sm font-medium transition-colors hover:bg-muted"
                     >
-                        Propose New Metric Target
+                        Propose a New KPI
                     </a>
                 </div>
             </div>
@@ -275,47 +285,50 @@ function StaffDashboardView({ metrics }: { metrics: any }) {
 }
 
 // =========================================================================
-// 3. EXECUTIVE / PRESIDENT DASHBOARD
+// 3. PRESIDENT DASHBOARD (read-only oversight)
 // =========================================================================
 function PresidentDashboardView({ metrics }: { metrics: any }) {
     const kraPerformanceData = metrics.kra_performance ?? [];
-
     const unitComplianceData = metrics.unit_compliance ?? [];
     const totalUnitsTracked = metrics.total_units_tracked ?? 0;
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Institutional Completion
-                        </span>
-                        <Target className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight text-indigo-600">
-                        {metrics.overall_completion ?? '0%'}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Strategic Overview KRAs
-                        </span>
-                        <BarChart3 className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {metrics.total_kras ?? 0}
-                    </p>
-                </div>
-                <div className="space-y-2 rounded-xl border border-red-100 bg-card bg-red-50/50 p-6 shadow-sm dark:border-red-900 dark:bg-red-950/20">
+                <StatCard
+                    label="Overall Completion"
+                    value={metrics.overall_completion ?? '0%'}
+                    valueClassName="font-mono"
+                    style={{ color: BRAND.forest }}
+                    icon={
+                        <Target
+                            className="h-5 w-5"
+                            style={{ color: BRAND.forest }}
+                        />
+                    }
+                />
+                <StatCard
+                    label="Key Result Areas"
+                    value={metrics.total_kras ?? 0}
+                    icon={
+                        <BarChart3
+                            className="h-5 w-5"
+                            style={{ color: BRAND.gold }}
+                        />
+                    }
+                />
+                <div className="space-y-2 rounded-xl border border-red-100 bg-red-50/50 p-6 shadow-sm dark:border-red-900 dark:bg-red-950/20">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-red-800 dark:text-red-400">
-                            Escalated Attention
+                            Needs Attention
                         </span>
                         <ShieldAlert className="h-5 w-5 text-red-600" />
                     </div>
-                    <p className="text-3xl font-bold tracking-tight text-red-600">
-                        {metrics.critical_alerts ?? 0} Workflow Delays
+                    <p className="font-mono text-3xl font-bold tracking-tight text-red-600">
+                        {metrics.critical_alerts ?? 0}
+                    </p>
+                    <p className="text-xs text-red-800/70 dark:text-red-400/70">
+                        Overdue or rejected submissions
                     </p>
                 </div>
             </div>
@@ -323,12 +336,12 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
             <div className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:col-span-2">
                     <div>
-                        <h3 className="text-lg leading-none font-semibold tracking-tight">
-                            KRA Strategic Target Tracking
+                        <h3 className="font-serif text-lg leading-none font-semibold tracking-tight">
+                            Progress by Key Result Area
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                            Current completion percentage across institutional
-                            Key Result Areas.
+                            Completion percentage for the current academic year,
+                            by KRA.
                         </p>
                     </div>
                     <div className="h-[300px] w-full pt-4">
@@ -363,7 +376,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                                     className="fill-muted-foreground text-xs"
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'rgba(0, 0, 0, 0.03)' }}
+                                    cursor={{ fill: 'rgba(14, 59, 39, 0.05)' }}
                                     formatter={(value) => [
                                         `${value}%`,
                                         'Progress',
@@ -371,7 +384,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                                 />
                                 <Bar
                                     dataKey="progress"
-                                    fill="#4f46e5"
+                                    fill={BRAND.forest}
                                     radius={[4, 4, 0, 0]}
                                     barSize={45}
                                 />
@@ -382,11 +395,11 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
 
                 <div className="flex flex-col justify-between rounded-xl border bg-card p-6 shadow-sm">
                     <div>
-                        <h3 className="text-lg leading-none font-semibold tracking-tight">
-                            Unit Submission Status
+                        <h3 className="font-serif text-lg leading-none font-semibold tracking-tight">
+                            Submission Status
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                            Status of tactical compliance workflows.
+                            How units' monthly reports are trending this period.
                         </p>
                     </div>
 
@@ -402,12 +415,14 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                                     paddingAngle={4}
                                     dataKey="value"
                                 >
-                                    {unitComplianceData.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={entry.color}
-                                        />
-                                    ))}
+                                    {unitComplianceData.map(
+                                        (entry: any, index: number) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={entry.color}
+                                            />
+                                        ),
+                                    )}
                                 </Pie>
                                 <Tooltip
                                     formatter={(value) => [value, 'Units']}
@@ -415,7 +430,9 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute text-center">
-                            <span className="text-3xl font-bold">14</span>
+                            <span className="font-mono text-3xl font-bold">
+                                {totalUnitsTracked}
+                            </span>
                             <p className="text-xs text-muted-foreground">
                                 Total Units
                             </p>
@@ -423,7 +440,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                     </div>
 
                     <div className="space-y-2">
-                        {unitComplianceData.map((item, index) => (
+                        {unitComplianceData.map((item: any, index: number) => (
                             <div
                                 key={index}
                                 className="flex items-center justify-between text-sm"
@@ -437,7 +454,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                                         {item.name}
                                     </span>
                                 </div>
-                                <span className="font-semibold">
+                                <span className="font-mono font-semibold">
                                     {item.value}
                                 </span>
                             </div>
@@ -446,24 +463,65 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-muted/30 p-6">
+            <div
+                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border p-6"
+                style={{ backgroundColor: BRAND.paper }}
+            >
                 <div className="space-y-1">
-                    <h3 className="flex items-center gap-2 font-semibold">
-                        <TrendingUp className="h-4 w-4 text-indigo-600" />{' '}
-                        Executive Oversight Engine
+                    <h3 className="flex items-center gap-2 font-serif font-semibold">
+                        <TrendingUp
+                            className="h-4 w-4"
+                            style={{ color: BRAND.forest }}
+                        />
+                        Full Report
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                        Data logs refresh dynamically upon operational group
-                        updates.
+                        See KPI-level detail across every unit and academic
+                        year.
                     </p>
                 </div>
                 <a
                     href="/reports"
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90"
+                    style={{ backgroundColor: BRAND.gold }}
                 >
-                    Open Advanced Analytics
+                    View Full Report
                 </a>
             </div>
+        </div>
+    );
+}
+
+// =========================================================================
+// Shared
+// =========================================================================
+function StatCard({
+    label,
+    value,
+    icon,
+    valueClassName = '',
+    style,
+}: {
+    label: string;
+    value: string | number;
+    icon: React.ReactNode;
+    valueClassName?: string;
+    style?: React.CSSProperties;
+}) {
+    return (
+        <div className="space-y-2 rounded-xl border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">
+                    {label}
+                </span>
+                {icon}
+            </div>
+            <p
+                className={`text-3xl font-bold tracking-tight ${valueClassName}`}
+                style={style}
+            >
+                {value}
+            </p>
         </div>
     );
 }

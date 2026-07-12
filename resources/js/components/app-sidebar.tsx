@@ -38,6 +38,12 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { dashboard } from '@/routes';
 import type { NavItem, SharedData } from '@/types';
 
@@ -93,7 +99,10 @@ const keyResultAreas: Kra[] = [
         title: 'Quality Research and Knowledge Management',
         reference: 'Mission #1 and QO #3',
         subAreas: [
-            { code: '2.1', title: 'Research Production, Dissemination, Utilization' },
+            {
+                code: '2.1',
+                title: 'Research Production, Dissemination, Utilization',
+            },
             { code: '2.2', title: 'Knowledge Management' },
             { code: '2.3', title: 'Library' },
         ],
@@ -138,7 +147,7 @@ const keyResultAreas: Kra[] = [
 
 // President — read-only, institution-wide oversight
 const presidentNavItems: NavItem[] = [
-    // { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
     // { title: 'KPI Tracker', href: '/kpis', icon: Gauge },
     // { title: 'Action Plans', href: '/action-plans', icon: ClipboardList },
     // { title: 'Responsible Units', href: '/units', icon: Users },
@@ -194,43 +203,103 @@ function getNavItemsForRole(role: string | undefined): NavItem[] {
 
 // Displays each KRA and its responsible areas; each area links to that
 // area's reports / exported spreadsheet and the people/units involved.
+// Titles can be long and get truncated by the sidebar layout, so every
+// truncated label is wrapped in a shadcn Tooltip — hovering (or
+// focusing via keyboard) reveals the full text in a styled popover
+// that matches the rest of the app, rather than the plain OS tooltip.
 function NavKeyResultAreas() {
     return (
-        <SidebarGroup>
-            <SidebarGroupLabel>Key Result Areas</SidebarGroupLabel>
-            <SidebarMenu>
-                {keyResultAreas.map((kra) => (
-                    <Collapsible key={kra.number} defaultOpen={false} className="group/collapsible">
-                        <SidebarMenuItem>
-                            <CollapsibleTrigger asChild>
-                                <SidebarMenuButton tooltip={`KRA ${kra.number}: ${kra.title}`}>
-                                    <Target />
-                                    <span className="truncate">
-                                        KRA {kra.number}: {kra.title}
-                                    </span>
-                                    <ChevronRight className="ml-auto shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                                </SidebarMenuButton>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <SidebarMenuSub>
-                                    {kra.subAreas.map((area) => (
-                                        <SidebarMenuSubItem key={area.code}>
-                                            <SidebarMenuSubButton asChild>
-                                                <Link href={`/reports/kras/${area.code}`}>
+        <TooltipProvider delayDuration={200}>
+            <SidebarGroup>
+                <SidebarGroupLabel>Key Result Areas</SidebarGroupLabel>
+                <SidebarMenu>
+                    {keyResultAreas.map((kra) => {
+                        const kraLabel = `KRA ${kra.number}: ${kra.title}`;
+                        const kraTooltip = `${kraLabel} (${kra.reference})`;
+
+                        return (
+                            <Collapsible
+                                key={kra.number}
+                                defaultOpen={false}
+                                className="group/collapsible"
+                            >
+                                <SidebarMenuItem>
+                                    {/*
+                                  SidebarMenuButton's `tooltip` prop already
+                                  renders a shadcn Tooltip internally, but it
+                                  only shows while the sidebar is collapsed
+                                  to icons. We wrap it in our own Tooltip too
+                                  so the full title is also reachable on
+                                  hover while the sidebar is expanded and
+                                  the label is truncated.
+                                */}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuButton
+                                                    tooltip={kraTooltip}
+                                                >
+                                                    <Target />
                                                     <span className="truncate">
-                                                        {area.code} {area.title}
+                                                        {kraLabel}
                                                     </span>
-                                                </Link>
-                                            </SidebarMenuSubButton>
-                                        </SidebarMenuSubItem>
-                                    ))}
-                                </SidebarMenuSub>
-                            </CollapsibleContent>
-                        </SidebarMenuItem>
-                    </Collapsible>
-                ))}
-            </SidebarMenu>
-        </SidebarGroup>
+                                                    <ChevronRight className="ml-auto shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                                </SidebarMenuButton>
+                                            </CollapsibleTrigger>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                            side="right"
+                                            align="start"
+                                        >
+                                            {kraTooltip}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            {kra.subAreas.map((area) => {
+                                                const areaLabel = `${area.code} ${area.title}`;
+
+                                                return (
+                                                    <SidebarMenuSubItem
+                                                        key={area.code}
+                                                    >
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <SidebarMenuSubButton
+                                                                    asChild
+                                                                >
+                                                                    <Link
+                                                                        href={`/reports/kras/${area.code}`}
+                                                                    >
+                                                                        <span className="truncate">
+                                                                            {
+                                                                                areaLabel
+                                                                            }
+                                                                        </span>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent
+                                                                side="right"
+                                                                align="start"
+                                                            >
+                                                                {areaLabel}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </SidebarMenuSubItem>
+                                                );
+                                            })}
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </SidebarMenuItem>
+                            </Collapsible>
+                        );
+                    })}
+                </SidebarMenu>
+            </SidebarGroup>
+        </TooltipProvider>
     );
 }
 

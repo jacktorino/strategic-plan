@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'UV President',
             'email' => 'president@uv.edu.ph',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('Testing123!'),
             'role' => 'president',
             'responsible_unit' => null,
         ]);
@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'System Administrator',
             'email' => 'admin@uv.edu.ph',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('Testing123!'),
             'role' => 'admin',
             'status' => 'approved',
             'responsible_unit' => 'Management Information System',
@@ -39,7 +39,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'HR Department Head',
             'email' => 'hr@uv.edu.ph',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('Testing123!'),
             'role' => 'staff',
             'responsible_unit' => 'Human Resources',
         ]);
