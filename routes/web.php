@@ -84,7 +84,9 @@ Route::middleware(['auth', 'verified', 'account.approved'])->group(function () {
     // 3. STAFF / UNIT ROUTES
     Route::prefix('my')->name('my.')->middleware('role:staff')->group(function () {
         Route::get('kpis', [UnitKpiController::class, 'index'])->name('kpis');
-        Route::post('kpis/{kpi}/submissions', [UnitKpiController::class, 'storeSubmission'])->name('my.kpis.submissions.store');
+        Route::post('/kpis/{kpi}', [UnitKpiController::class, 'storeSubmission'])->name('kpis.store');
+     Route::post('kpis/bulk', [UnitKpiController::class, 'bulkStore'])
+    ->name('kpis.bulk');
         Route::get('action-plans', [UnitActionPlanController::class, 'index'])->name('action-plans');
         Route::get('kpi-submissions', [UnitKpiSubmissionController::class, 'index'])->name('kpi-submissions.index');
         Route::get('reports', [UnitReportController::class, 'index'])->name('reports');

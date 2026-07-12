@@ -38,7 +38,8 @@ type MonthlySubmission = {
     percentage_achieved: string; // decimal cast comes over the wire as a string
     status: 'draft' | 'submitted' | 'approved' | 'rejected';
     remarks: string | null;
-    unit: Unit;
+    action_plan_id: number | null;
+    unit: Unit | null;
 };
 
 type KpiTarget = {
@@ -114,18 +115,17 @@ function formatPercentage(value: string | undefined): string {
     return Number.isFinite(n) ? `${n}%` : '—';
 }
 
-// An action plan's own submissions are whichever of the KPI's monthly
-// submissions were made by one of the action plan's responsible units.
-// If the action plan has no units of its own, fall back to the KPI's units
-// (i.e. the whole KPI's submissions apply to it).
-function submissionsForActionPlan(
+// A KPI's monthly submissions are keyed by (kpi_id, action_plan_id, year,
+// month) — see UnitKpiController::storeSubmission(). Pass an action plan's
+// id to get that plan's submissions, or null to get the KPI-level
+// submissions recorded for a KPI with no action plans.
+function submissionsFor(
     kpi: Kpi,
-    plan: ActionPlan,
+    actionPlanId: number | null,
 ): MonthlySubmission[] {
-    const unitIds = new Set(
-        (plan.units.length > 0 ? plan.units : kpi.units).map((u) => u.id),
+    return kpi.monthly_submissions.filter(
+        (s) => s.action_plan_id === actionPlanId,
     );
-    return kpi.monthly_submissions.filter((s) => unitIds.has(s.unit.id));
 }
 
 function UnitBadges({ units }: { units: Unit[] }) {
@@ -185,31 +185,26 @@ function KpiHeaderCell({ kpi }: { kpi: Kpi }) {
             <p className="text-sm leading-relaxed font-medium">
                 {kpi.description}
             </p>
-            <UnitBadges units={kpi.units} />
+            {/* <UnitBadges units={kpi.units} /> */}
         </div>
     );
 }
 
-// One row per action plan. Target is the KPI's (shown on every row, since
-// it doesn't vary by action plan). Monthly submissions are derived by
-// matching the action plan's responsible unit(s) against the KPI's
-// submissions.
-// Column order: KPI (merged) | Monthly submissions | Target | Action plan | Responsible units
+// One row per action plan. Monthly submissions are looked up by matching
+// the submission's action_plan_id against this action plan's id.
+// Column order: KPI (merged) | Monthly submissions | Action plan | Responsible units
 function ActionPlanRow({
     kpi,
     plan,
-    currentAcademicYear,
     isFirstInKpi,
     kpiRowSpan,
 }: {
     kpi: Kpi;
     plan: ActionPlan;
-    currentAcademicYear: AcademicYear;
     isFirstInKpi: boolean;
     kpiRowSpan: number;
 }) {
-    const target = kpi.targets[0]; // controller already scopes this to the current AY
-    const latestSubmissions = submissionsForActionPlan(kpi, plan).slice(0, 6);
+    const latestSubmissions = submissionsFor(kpi, plan.id).slice(0, 6);
 
     return (
         <TableRow className="align-top">
@@ -224,18 +219,18 @@ function ActionPlanRow({
 
             <TableCell className="min-w-[280px]">
                 {latestSubmissions.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">
-                        Not Yet Submitted
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">0%</span>
+                        <span className="text-sm text-muted-foreground">
+                            Not Yet Submitted
+                        </span>
+                    </div>
                 ) : (
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="h-7 py-1 text-[11px]">
                                     Month
-                                </TableHead>
-                                <TableHead className="h-7 py-1 text-[11px]">
-                                    Unit
                                 </TableHead>
                                 <TableHead className="h-7 py-1 text-[11px]">
                                     Achieved
@@ -251,9 +246,6 @@ function ActionPlanRow({
                                     <TableCell className="py-1 text-xs whitespace-nowrap">
                                         {monthNames[submission.month - 1]}{' '}
                                         {submission.year}
-                                    </TableCell>
-                                    <TableCell className="py-1 text-xs">
-                                        {submission.unit.code}
                                     </TableCell>
                                     <TableCell className="py-1 text-xs">
                                         {formatPercentage(
@@ -277,29 +269,85 @@ function ActionPlanRow({
                 )}
             </TableCell>
 
-            <TableCell className="whitespace-nowrap">
-                {target ? (
-                    <div>
-                        <p className="text-sm font-medium">
-                            {formatPercentage(target.target_percentage)}
-                        </p>
-                        {currentAcademicYear && (
-                            <p className="text-xs text-muted-foreground">
-                                {currentAcademicYear.label}
-                            </p>
-                        )}
-                    </div>
-                ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                )}
-            </TableCell>
-
             <TableCell className="min-w-[220px]">
                 <p className="text-sm leading-relaxed">{plan.description}</p>
             </TableCell>
 
             <TableCell className="min-w-[140px]">
                 <UnitBadges units={plan.units} />
+            </TableCell>
+        </TableRow>
+    );
+}
+
+// A KPI with no action plans still gets one editable row on the staff
+// submission page (action_plan_id = null), so its submissions need to be
+// shown here too rather than replaced by a static placeholder.
+function KpiOnlyRow({ kpi }: { kpi: Kpi }) {
+    const latestSubmissions = submissionsFor(kpi, null).slice(0, 6);
+
+    return (
+        <TableRow className="align-top">
+            <TableCell className="min-w-[200px] border-r bg-muted/30 align-top">
+                <KpiHeaderCell kpi={kpi} />
+            </TableCell>
+
+            <TableCell className="min-w-[280px]">
+                {latestSubmissions.length === 0 ? (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">0%</span>
+                        <span className="text-sm text-muted-foreground">
+                            Not Yet Submitted
+                        </span>
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="h-7 py-1 text-[11px]">
+                                    Month
+                                </TableHead>
+                                <TableHead className="h-7 py-1 text-[11px]">
+                                    Achieved
+                                </TableHead>
+                                <TableHead className="h-7 py-1 text-[11px]">
+                                    Status
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {latestSubmissions.map((submission) => (
+                                <TableRow key={submission.id}>
+                                    <TableCell className="py-1 text-xs whitespace-nowrap">
+                                        {monthNames[submission.month - 1]}{' '}
+                                        {submission.year}
+                                    </TableCell>
+                                    <TableCell className="py-1 text-xs">
+                                        {formatPercentage(
+                                            submission.percentage_achieved,
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="py-1">
+                                        <Badge
+                                            variant={
+                                                statusVariant[submission.status]
+                                            }
+                                            className="text-[10px]"
+                                        >
+                                            {submission.status}
+                                        </Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </TableCell>
+
+            <TableCell colSpan={2}>
+                <span className="text-sm text-muted-foreground">
+                    No action plans defined for this KPI yet.
+                </span>
             </TableCell>
         </TableRow>
     );
@@ -380,7 +428,6 @@ export default function Show({ subArea, currentAcademicYear, kpis }: Props) {
                                         Key Performance Indicator
                                     </TableHead>
                                     <TableHead>Monthly submissions</TableHead>
-                                    <TableHead>Target</TableHead>
                                     <TableHead>Action plan</TableHead>
                                     <TableHead>Responsible units</TableHead>
                                 </TableRow>
@@ -398,24 +445,14 @@ export default function Show({ subArea, currentAcademicYear, kpis }: Props) {
                                                 key={plan.id}
                                                 kpi={kpi}
                                                 plan={plan}
-                                                currentAcademicYear={
-                                                    currentAcademicYear
-                                                }
                                                 isFirstInKpi={isFirstInKpi}
                                                 kpiRowSpan={kpiRowSpan}
                                             />
                                         ) : (
-                                            <TableRow key={kpi.id}>
-                                                <TableCell className="min-w-[200px] border-r bg-muted/30 align-top">
-                                                    <KpiHeaderCell kpi={kpi} />
-                                                </TableCell>
-                                                <TableCell colSpan={4}>
-                                                    <span className="text-sm text-muted-foreground">
-                                                        No action plans defined
-                                                        for this KPI yet.
-                                                    </span>
-                                                </TableCell>
-                                            </TableRow>
+                                            <KpiOnlyRow
+                                                key={kpi.id}
+                                                kpi={kpi}
+                                            />
                                         ),
                                 )}
                             </TableBody>

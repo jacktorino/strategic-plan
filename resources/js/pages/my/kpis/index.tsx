@@ -1,11 +1,35 @@
-import { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
-import { Building2, Target, Send } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Building2, Check, Loader2, Send, Target } from 'lucide-react';
+import axios from 'axios';
 
+import { Badge } from '@/components/ui/badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+
+// ---------------------------------------------------------------------------
+// Types — mirror UnitKpiController::index()'s Inertia props exactly.
+// ---------------------------------------------------------------------------
 type Submission = {
     id: number;
+    action_plan_id: number | null;
     submission_month: string;
     compliance_percentage: number;
+    unit_code: string | null;
 };
 
 type ActionPlan = {
@@ -35,6 +59,11 @@ type Props = {
     kras: Kra[];
     selectedAY: string;
     unitCode: string;
+    // Optional — backend can pass the real list of academic years (e.g.
+    // from AcademicYear::orderByDesc('start_year')->pluck(...)). Falls back
+    // to a generated range around selectedAY if not provided, so this still
+    // renders sensibly before the controller is updated to pass it.
+    academicYears?: string[];
 };
 
 const MONTHS = [
@@ -52,47 +81,320 @@ const MONTHS = [
     'December',
 ];
 
-export default function UnitKpis({ kras, selectedAY, unitCode }: Props) {
-    const [openKpiId, setOpenKpiId] = useState<number | null>(null);
+function generateAcademicYearOptions(selectedAY: string): string[] {
+    const currentStart =
+        Number(selectedAY.split('-')[0]) || new Date().getFullYear();
+    const years: string[] = [];
+    for (let y = currentStart + 1; y >= currentStart - 3; y--) {
+        years.push(`${y}-${y + 1}`);
+    }
+    return years;
+}
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        academic_year: selectedAY,
-        submission_month: MONTHS[new Date().getMonth()],
-        compliance_percentage: 100,
-    });
+// Each editable row (one per action plan, or one per KPI when it has no
+// action plans) gets its own cell — a KPI is no longer a single rowSpan
+// input, since different action plans under the same KPI can report
+// different percentages.
+type RowKey = string;
 
-    const submit = (kpiId: number) => {
-        post(`/my/kpis/${kpiId}/submissions`, {
+// The month is no longer per-row — every entry is submitted for whichever
+// month is selected in the header ("Month" select), so a row only needs to
+// track its own percentage.
+type MonthlyEntry = {
+    kpiId: number;
+    planId: number | null;
+    compliance_percentage: number | '';
+};
+
+function rowKeyFor(kpiId: number, planId: number | null): RowKey {
+    return planId === null ? `kpi-${kpiId}` : `plan-${planId}`;
+}
+
+// The submission already in the database for this row + the currently
+// selected month, if any — this is what lets the input show what was
+// already submitted instead of always starting blank.
+function existingSubmissionFor(
+    kpi: Kpi,
+    planId: number | null,
+    month: string,
+): Submission | undefined {
+    return kpi.submissions.find(
+        (s) => s.action_plan_id === planId && s.submission_month === month,
+    );
+}
+
+function UnitBadges({ units }: { units: string[] }) {
+    if (units.length === 0) {
+        return <span className="text-sm text-muted-foreground">—</span>;
+    }
+    return (
+        <div className="flex flex-wrap items-center gap-1">
+            <Building2 className="h-3 w-3 text-muted-foreground" />
+            {units.map((code) => (
+                <Badge key={code} variant="outline" className="text-[10px]">
+                    {code}
+                </Badge>
+            ))}
+        </div>
+    );
+}
+
+function KpiHeaderCell({ kpi }: { kpi: Kpi }) {
+    return (
+        <div className="space-y-1.5">
+            <p className="font-mono text-xs text-muted-foreground">
+                {kpi.code}
+            </p>
+            <p className="text-sm leading-relaxed font-medium">{kpi.name}</p>
+        </div>
+    );
+}
+
+function postSubmission(
+    kpiId: number,
+    body: {
+        academic_year: string;
+        submission_month: string;
+        compliance_percentage: number;
+        action_plan_id: number | null;
+    },
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        router.post(`/my/kpis/${kpiId}`, body, {
             preserveScroll: true,
-            onSuccess: () => {
-                reset('compliance_percentage');
-                setOpenKpiId(null);
-            },
+            onSuccess: () => resolve(),
+            onError: (errors) => reject(errors as Record<string, string>),
         });
+    });
+}
+
+export default function UnitKpis({
+    kras,
+    selectedAY,
+    unitCode,
+    academicYears,
+}: Props) {
+    const [entries, setEntries] = useState<Record<RowKey, MonthlyEntry>>({});
+    const [errorsByRow, setErrorsByRow] = useState<
+        Record<RowKey, string | undefined>
+    >({});
+    const [submittingAll, setSubmittingAll] = useState(false);
+
+    // The single month every row in the table submits for — set in the
+    // header. Rows no longer carry their own month, so this is the only
+    // source of truth at submit time.
+    const [selectedMonth, setSelectedMonth] = useState(
+        MONTHS[new Date().getMonth()],
+    );
+
+    // Entries track *unsaved edits* for whichever month is selected. If we
+    // didn't clear them on month change, a value typed for July would still
+    // be sitting in state (and would get submitted!) after switching to
+    // August, since entries aren't keyed by month.
+    useEffect(() => {
+        setEntries({});
+        setErrorsByRow({});
+    }, [selectedMonth]);
+
+    const ayOptions = useMemo(
+        () => academicYears ?? generateAcademicYearOptions(selectedAY),
+        [academicYears, selectedAY],
+    );
+
+    const changeAcademicYear = (value: string) => {
+        if (value === selectedAY) return;
+        router.get(
+            window.location.pathname,
+            {
+                ...Object.fromEntries(
+                    new URLSearchParams(window.location.search),
+                ),
+                academic_year: value,
+            },
+            { preserveScroll: true, preserveState: false },
+        );
+    };
+
+    const entryFor = (kpiId: number, planId: number | null): MonthlyEntry => {
+        const key = rowKeyFor(kpiId, planId);
+        return (
+            entries[key] ?? {
+                kpiId,
+                planId,
+                compliance_percentage: '',
+            }
+        );
+    };
+
+    // What the input should actually show: an in-progress edit takes
+    // priority, otherwise fall back to whatever's already saved in the
+    // database for this row + selected month.
+    const displayValueFor = (kpi: Kpi, planId: number | null): number | '' => {
+        const entry = entryFor(kpi.id, planId);
+        if (entry.compliance_percentage !== '') {
+            return entry.compliance_percentage;
+        }
+        return (
+            existingSubmissionFor(kpi, planId, selectedMonth)
+                ?.compliance_percentage ?? ''
+        );
+    };
+
+    const updateEntry = (
+        kpiId: number,
+        planId: number | null,
+        patch: Partial<MonthlyEntry>,
+    ) => {
+        const key = rowKeyFor(kpiId, planId);
+        setEntries((prev) => ({
+            ...prev,
+            [key]: { ...entryFor(kpiId, planId), ...patch, kpiId, planId },
+        }));
+    };
+
+    const dirtyCount = useMemo(
+        () =>
+            Object.values(entries).filter((e) => e.compliance_percentage !== '')
+                .length,
+        [entries],
+    );
+
+    const submitAll = async () => {
+        const rows = Object.entries(entries).filter(
+            ([, entry]) => entry.compliance_percentage !== '',
+        );
+        if (rows.length === 0) return;
+
+        setSubmittingAll(true);
+        const nextErrors: Record<RowKey, string | undefined> = {};
+        const succeededKeys: RowKey[] = [];
+
+        for (const [rowKey, entry] of rows) {
+            try {
+                await postSubmission(entry.kpiId, {
+                    academic_year: selectedAY,
+                    submission_month: selectedMonth,
+                    compliance_percentage:
+                        entry.compliance_percentage as number,
+                    action_plan_id: entry.planId,
+                });
+                succeededKeys.push(rowKey);
+            } catch (errors) {
+                nextErrors[rowKey] = (
+                    errors as Record<string, string>
+                ).compliance_percentage;
+            }
+        }
+
+        setEntries((prev) => {
+            const next = { ...prev };
+            succeededKeys.forEach((key) => delete next[key]);
+            return next;
+        });
+        setErrorsByRow(nextErrors);
+        setSubmittingAll(false);
     };
 
     const totalKpis = kras.reduce((sum, k) => sum + k.kpis.length, 0);
 
+    type Row =
+        | {
+              kpi: Kpi;
+              plan: ActionPlan;
+              isFirstInKpi: boolean;
+              kpiRowSpan: number;
+          }
+        | { kpi: Kpi; plan: null; isFirstInKpi: true; kpiRowSpan: number };
+
+    const rowsFor = (kpis: Kpi[]): Row[] =>
+        kpis.flatMap((kpi): Row[] => {
+            if (kpi.action_plans.length === 0) {
+                return [{ kpi, plan: null, isFirstInKpi: true, kpiRowSpan: 1 }];
+            }
+            return kpi.action_plans.map((plan, index) => ({
+                kpi,
+                plan,
+                isFirstInKpi: index === 0,
+                kpiRowSpan: kpi.action_plans.length,
+            }));
+        });
+
     return (
         <>
-            <Head title={`My KPIs — ${unitCode}`} />
-            <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-gray-900">
-                        <Target className="h-6 w-6 text-green-600" />
-                        My KPIs
-                    </h1>
-                    <p className="text-sm text-gray-500">
-                        {totalKpis} KPI{totalKpis === 1 ? '' : 's'} assigned to{' '}
-                        <span className="font-semibold text-gray-700">
-                            {unitCode}
-                        </span>{' '}
-                        for AY {selectedAY}.
-                    </p>
+            <Head
+                title={
+                    kras.length > 0
+                        ? `${kras[0].code} ${kras[0].title}`
+                        : `My KPIs — ${unitCode}`
+                }
+            />
+            <div className="mx-auto w-full space-y-6 p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm">
+                    {kras.length > 0 ? (
+                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight uppercase">
+                            <Target className="h-6 w-6 shrink-0 text-emerald-600" />
+                            KRA {kras[0].code} : {kras[0].title}
+                        </h1>
+                    ) : (
+                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+                            <Target className="h-6 w-6 text-emerald-600" />
+                            My KPIs
+                        </h1>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">
+                                Academic year
+                            </span>
+                            <Select
+                                value={selectedAY}
+                                onValueChange={changeAcademicYear}
+                            >
+                                <SelectTrigger className="h-9 w-[130px] text-sm focus:ring-1 focus:ring-emerald-500">
+                                    <SelectValue placeholder="Select year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {!ayOptions.includes(selectedAY) && (
+                                        <SelectItem value={selectedAY}>
+                                            {selectedAY}
+                                        </SelectItem>
+                                    )}
+                                    {ayOptions.map((ay) => (
+                                        <SelectItem key={ay} value={ay}>
+                                            {ay}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </label>
+
+                        <label className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Month</span>
+                            <Select
+                                value={selectedMonth}
+                                onValueChange={setSelectedMonth}
+                            >
+                                <SelectTrigger
+                                    className="h-9 w-[130px] text-sm focus:ring-1 focus:ring-emerald-500"
+                                    title="Every entry below will be submitted for this month"
+                                >
+                                    <SelectValue placeholder="Select month" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MONTHS.map((m) => (
+                                        <SelectItem key={m} value={m}>
+                                            {m}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </label>
+                    </div>
                 </div>
 
                 {totalKpis === 0 ? (
-                    <div className="rounded-lg border border-dashed p-12 text-center text-gray-400">
+                    <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
                         No KPIs are currently assigned to your unit for AY{' '}
                         {selectedAY}.
                     </div>
@@ -101,197 +403,199 @@ export default function UnitKpis({ kras, selectedAY, unitCode }: Props) {
                         {kras.map((kra) => (
                             <div
                                 key={kra.id}
-                                className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                                className="overflow-hidden border bg-card shadow-sm"
                             >
-                                <div className="flex items-center gap-3 bg-gray-50/70 p-4">
-                                    <span className="rounded-md bg-green-50 px-2.5 py-1 font-mono text-sm font-black text-green-600">
-                                        {kra.code}
-                                    </span>
-                                    <h3 className="text-sm font-bold text-gray-900 md:text-base">
-                                        {kra.title}
-                                    </h3>
-                                </div>
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>
+                                                    Key Performance Indicator
+                                                </TableHead>
+                                                <TableHead className="min-w-[110px]">
+                                                    {selectedMonth} %
+                                                </TableHead>
+                                                <TableHead>
+                                                    Action plan
+                                                </TableHead>
+                                                <TableHead>
+                                                    Responsible units
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {rowsFor(kra.kpis).map(
+                                                ({
+                                                    kpi,
+                                                    plan,
+                                                    isFirstInKpi,
+                                                    kpiRowSpan,
+                                                }) => {
+                                                    const planId =
+                                                        plan?.id ?? null;
+                                                    const rowKey = rowKeyFor(
+                                                        kpi.id,
+                                                        planId,
+                                                    );
+                                                    const fieldError =
+                                                        errorsByRow[rowKey];
+                                                    const displayValue =
+                                                        displayValueFor(
+                                                            kpi,
+                                                            planId,
+                                                        );
+                                                    // Saved = this value came
+                                                    // from the database and
+                                                    // the user hasn't typed
+                                                    // anything to override it
+                                                    // yet.
+                                                    const isSaved =
+                                                        entryFor(kpi.id, planId)
+                                                            .compliance_percentage ===
+                                                            '' &&
+                                                        displayValue !== '';
 
-                                <div className="divide-y divide-gray-100">
-                                    {kra.kpis.map((kpi) => (
-                                        <div key={kpi.id} className="p-4">
-                                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                                <div>
-                                                    <span className="mr-2 font-mono text-xs font-bold text-gray-500">
-                                                        {kpi.code}
-                                                    </span>
-                                                    <span className="text-sm font-medium text-gray-800">
-                                                        {kpi.name}
-                                                    </span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-200">
-                                                        <div
-                                                            className={`h-full rounded-full ${
-                                                                kpi.average_compliance >=
-                                                                90
-                                                                    ? 'bg-emerald-500'
-                                                                    : kpi.average_compliance >=
-                                                                        50
-                                                                      ? 'bg-amber-500'
-                                                                      : 'bg-rose-500'
-                                                            }`}
-                                                            style={{
-                                                                width: `${kpi.average_compliance}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-gray-600">
-                                                        {kpi.average_compliance}
-                                                        % complied · target{' '}
-                                                        {kpi.active_target}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-2 space-y-1.5 pl-1">
-                                                {kpi.action_plans.map(
-                                                    (plan, idx) => (
-                                                        <p
-                                                            key={plan.id}
-                                                            className="text-xs leading-relaxed text-gray-600"
+                                                    return (
+                                                        <TableRow
+                                                            key={rowKey}
+                                                            className="align-top"
                                                         >
-                                                            <span className="font-bold text-gray-400">
-                                                                {idx + 1}.
-                                                            </span>{' '}
-                                                            {plan.description}
-                                                            <span className="ml-2 inline-flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
-                                                                <Building2 className="h-2.5 w-2.5" />
-                                                                {plan.responsible_units.join(
-                                                                    ', ',
-                                                                )}
-                                                            </span>
-                                                        </p>
-                                                    ),
-                                                )}
-                                            </div>
-
-                                            {kpi.submissions.length > 0 && (
-                                                <div className="mt-3 flex flex-wrap gap-1">
-                                                    {kpi.submissions.map(
-                                                        (sub) => (
-                                                            <span
-                                                                key={sub.id}
-                                                                className="rounded border bg-gray-50 px-1.5 py-0.5 font-mono text-[10px] text-gray-600"
-                                                            >
-                                                                {sub.submission_month.substring(
-                                                                    0,
-                                                                    3,
-                                                                )}
-                                                                :{' '}
-                                                                <strong className="text-gray-900">
-                                                                    {
-                                                                        sub.compliance_percentage
+                                                            {isFirstInKpi && (
+                                                                <TableCell
+                                                                    rowSpan={
+                                                                        kpiRowSpan
                                                                     }
-                                                                    %
-                                                                </strong>
-                                                            </span>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {openKpiId === kpi.id ? (
-                                                <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-gray-500 uppercase">
-                                                            Month
-                                                        </label>
-                                                        <select
-                                                            value={
-                                                                data.submission_month
-                                                            }
-                                                            onChange={(e) =>
-                                                                setData(
-                                                                    'submission_month',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            className="block rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs"
-                                                        >
-                                                            {MONTHS.map((m) => (
-                                                                <option
-                                                                    key={m}
-                                                                    value={m}
+                                                                    className="min-w-[220px] border-r bg-muted/20 align-top"
                                                                 >
-                                                                    {m}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-gray-500 uppercase">
-                                                            Compliance %
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={100}
-                                                            value={
-                                                                data.compliance_percentage
-                                                            }
-                                                            onChange={(e) =>
-                                                                setData(
-                                                                    'compliance_percentage',
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }
-                                                            className="block w-20 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs"
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        disabled={processing}
-                                                        onClick={() =>
-                                                            submit(kpi.id)
-                                                        }
-                                                        className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-50"
-                                                    >
-                                                        <Send className="h-3 w-3" />
-                                                        Submit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setOpenKpiId(null)
-                                                        }
-                                                        className="rounded-md px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                    {errors.compliance_percentage && (
-                                                        <p className="w-full text-xs text-red-500">
-                                                            {
-                                                                errors.compliance_percentage
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setOpenKpiId(kpi.id)
-                                                    }
-                                                    className="mt-3 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-bold text-gray-600 hover:border-green-600 hover:text-green-600"
-                                                >
-                                                    Report this month's progress
-                                                </button>
+                                                                    <KpiHeaderCell
+                                                                        kpi={
+                                                                            kpi
+                                                                        }
+                                                                    />
+                                                                </TableCell>
+                                                            )}
+
+                                                            <TableCell className="border-r p-1 align-top">
+                                                                <div className="flex items-center gap-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        max={
+                                                                            100
+                                                                        }
+                                                                        placeholder="—"
+                                                                        value={
+                                                                            displayValue
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateEntry(
+                                                                                kpi.id,
+                                                                                planId,
+                                                                                {
+                                                                                    compliance_percentage:
+                                                                                        e
+                                                                                            .target
+                                                                                            .value ===
+                                                                                        ''
+                                                                                            ? ''
+                                                                                            : Number(
+                                                                                                  e
+                                                                                                      .target
+                                                                                                      .value,
+                                                                                              ),
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                        className={`w-16 rounded border px-1.5 py-1 text-right text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                                                                            isSaved
+                                                                                ? 'border-emerald-200 bg-emerald-50'
+                                                                                : 'border-input bg-background'
+                                                                        }`}
+                                                                    />
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        %
+                                                                    </span>
+                                                                    {isSaved && (
+                                                                        <Check
+                                                                            className="h-3 w-3 shrink-0 text-emerald-600"
+                                                                            aria-label="Already submitted"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                {fieldError && (
+                                                                    <p className="mt-1 text-[10px] text-destructive">
+                                                                        {
+                                                                            fieldError
+                                                                        }
+                                                                    </p>
+                                                                )}
+                                                            </TableCell>
+
+                                                            {plan ? (
+                                                                <>
+                                                                    <TableCell className="min-w-[220px]">
+                                                                        <p className="text-sm leading-relaxed">
+                                                                            {
+                                                                                plan.description
+                                                                            }
+                                                                        </p>
+                                                                    </TableCell>
+                                                                    <TableCell className="min-w-[140px]">
+                                                                        <UnitBadges
+                                                                            units={
+                                                                                plan.responsible_units
+                                                                            }
+                                                                        />
+                                                                    </TableCell>
+                                                                </>
+                                                            ) : (
+                                                                <TableCell
+                                                                    colSpan={2}
+                                                                >
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        No
+                                                                        action
+                                                                        plans
+                                                                        defined
+                                                                        for this
+                                                                        KPI yet.
+                                                                    </span>
+                                                                </TableCell>
+                                                            )}
+                                                        </TableRow>
+                                                    );
+                                                },
                                             )}
-                                        </div>
-                                    ))}
+                                        </TableBody>
+                                    </Table>
                                 </div>
                             </div>
                         ))}
+
+                        <div className="flex items-center justify-end gap-3 border-t pt-4">
+                            {dirtyCount > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                    {dirtyCount} entr
+                                    {dirtyCount === 1 ? 'y' : 'ies'} to submit
+                                    for {selectedMonth}
+                                </span>
+                            )}
+                            <Button
+                                type="button"
+                                disabled={dirtyCount === 0 || submittingAll}
+                                onClick={submitAll}
+                                className="inline-flex items-center gap-2 px-6 disabled:opacity-50"
+                            >
+                                {submittingAll ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                                {submittingAll ? 'Submitting…' : 'Submit all'}
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>

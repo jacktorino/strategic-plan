@@ -50,7 +50,7 @@ export default function Dashboard({ role, unit, metrics }: Props) {
 
             <div className="space-y-6 p-6">
                 <div className="flex flex-col gap-1">
-                    <h1 className="font-serif text-3xl font-bold tracking-tight">
+                    <h1 className="text-3xl font-bold tracking-tight">
                         Dashboard
                     </h1>
                     <p className="text-sm text-muted-foreground">
@@ -117,7 +117,7 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
             <div className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:col-span-2">
                     <div>
-                        <h3 className="font-serif text-lg leading-none font-semibold">
+                        <h3 className="text-lg leading-none font-semibold">
                             Submission Activity
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -171,7 +171,7 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
 
                 <div className="flex flex-col justify-between space-y-4 rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-1">
-                        <h3 className="text-md flex items-center gap-2 font-serif font-semibold">
+                        <h3 className="text-md flex items-center gap-2 font-semibold">
                             <Layers
                                 className="h-4 w-4"
                                 style={{ color: BRAND.forest }}
@@ -251,7 +251,7 @@ function StaffDashboardView({ metrics }: { metrics: any }) {
                 style={{ backgroundColor: `${BRAND.paper}` }}
             >
                 <div className="space-y-2 md:col-span-2">
-                    <h3 className="flex items-center gap-2 font-serif text-lg font-semibold">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold">
                         <ClipboardCheck
                             className="h-5 w-5"
                             style={{ color: BRAND.forest }}
@@ -336,7 +336,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
             <div className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:col-span-2">
                     <div>
-                        <h3 className="font-serif text-lg leading-none font-semibold tracking-tight">
+                        <h3 className="text-lg leading-none font-semibold tracking-tight">
                             Progress by Key Result Area
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -395,7 +395,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
 
                 <div className="flex flex-col justify-between rounded-xl border bg-card p-6 shadow-sm">
                     <div>
-                        <h3 className="font-serif text-lg leading-none font-semibold tracking-tight">
+                        <h3 className="text-lg leading-none font-semibold tracking-tight">
                             Submission Status
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -468,7 +468,7 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                 style={{ backgroundColor: BRAND.paper }}
             >
                 <div className="space-y-1">
-                    <h3 className="flex items-center gap-2 font-serif font-semibold">
+                    <h3 className="flex items-center gap-2 font-semibold">
                         <TrendingUp
                             className="h-4 w-4"
                             style={{ color: BRAND.forest }}

@@ -180,7 +180,7 @@ const adminNavItems: NavItem[] = [
 const unitNavItems: NavItem[] = [
     { title: 'My Dashboard', href: dashboard(), icon: LayoutGrid },
     { title: 'My KPIs', href: '/my/kpis', icon: Gauge },
-    { title: 'My Action Plans', href: '/my/action-plans', icon: CheckSquare },
+    // { title: 'My Action Plans', href: '/my/action-plans', icon: CheckSquare },
     {
         title: 'Propose a KPI',
         href: '/my/kpi-submissions/create',

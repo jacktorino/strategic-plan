@@ -3,37 +3,51 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Kra;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class AdminKraController extends Controller
 {
-    public function index()
+    public function index(): Response
     {
-        $kras = DB::table('kras')->orderBy('code', 'asc')->get();
+        $kras = Kra::query()
+            ->withCount('subAreas')
+            ->orderBy('number')
+            ->get();
 
         return Inertia::render('admin/kras/index', [
-            'kras' => $kras
+            'kras' => $kras,
         ]);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'code' => 'required|string|unique:kras,code',
-        'title' => 'required|string|max:255', // 🌟 Changed from name to title
-        'description' => 'nullable|string',
-    ]);
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'number' => ['required', 'integer', 'unique:key_result_areas,number'],
+            'title' => ['required', 'string', 'max:255'],
+            'reference' => ['nullable', 'string', 'max:255'],
+        ]);
 
-    DB::table('kras')->insert([
-        'code' => $validated['code'],
-        'title' => $validated['title'], // 🌟 Changed from name to title
-        'description' => $validated['description'],
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+        Kra::create($validated);
 
-    return redirect()->back()->with('success', 'KRA created successfully.');
-}
+        return redirect()->back()->with('success', 'KRA created successfully.');
+    }
+
+    public function storeSubArea(Request $request, Kra $kra)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'unique:kra_sub_areas,code'],
+            'title' => ['required', 'string', 'max:255'],
+        ]);
+
+        $kra->subAreas()->create([
+            'code' => $validated['code'],
+            'title' => $validated['title'],
+            'sort_order' => $kra->subAreas()->count(),
+        ]);
+
+        return redirect()->back()->with('success', 'Sub-area created successfully.');
+    }
 }

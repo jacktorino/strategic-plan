@@ -96,47 +96,6 @@ export function AppSidebarHeader({
                         className="h-9 w-48 pl-8 lg:w-64"
                     />
                 </div>
-
-                <div className="flex items-center overflow-x-auto rounded-md border p-0.5">
-                    {MONTHS.map((label, index) => {
-                        const month = index + 1;
-                        const isActive = month === activeMonth;
-                        return (
-                            <button
-                                key={label}
-                                type="button"
-                                onClick={() => handleMonthClick(month)}
-                                aria-pressed={isActive}
-                                className={`rounded px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
-                                    isActive
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                <Select
-                    value={selectedAcademicYearId?.toString()}
-                    onValueChange={onAcademicYearChange}
-                >
-                    <SelectTrigger className="h-9 w-40">
-                        <SelectValue placeholder="Academic Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {academicYears.map((year) => (
-                            <SelectItem
-                                key={year.id}
-                                value={year.id.toString()}
-                            >
-                                {year.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
             </div>
         </header>
     );

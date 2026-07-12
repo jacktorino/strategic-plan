@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class MonthlySubmission extends Model
 {
     protected $fillable = [
-        'kpi_id', 'unit_id', 'academic_year_id',
+        'kpi_id', 'action_plan_id', 'unit_id', 'academic_year_id',
         'year', 'month', 'percentage_achieved', 'remarks',
         'status', 'submitted_by', 'submitted_at', 'reviewed_by', 'reviewed_at',
     ];
@@ -24,6 +24,11 @@ class MonthlySubmission extends Model
     public function kpi(): BelongsTo
     {
         return $this->belongsTo(Kpi::class, 'kpi_id');
+    }
+
+    public function actionPlan(): BelongsTo
+    {
+        return $this->belongsTo(ActionPlan::class, 'action_plan_id');
     }
 
     public function unit(): BelongsTo
