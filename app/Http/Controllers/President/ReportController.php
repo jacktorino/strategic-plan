@@ -5,6 +5,7 @@ namespace App\Http\Controllers\President;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\KraSubArea;
+use App\Models\MonthlySubmission;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,18 +18,31 @@ class ReportController extends Controller
     }
 
     /**
-     * /reports/kras/{code} — e.g. "1.1". Shows this sub-area's KPIs, each
-     * with its current-year target, latest monthly submission per unit,
-     * responsible units, and action plans.
+     * /reports/kras/{code}?academic_year_id=
      *
-     * Note: monthly_submissions is keyed by (kpi_id, unit_id, year, month) —
-     * there is no per-action-plan submission row. The frontend derives each
-     * action plan's relevant submissions by matching the action plan's
-     * responsible unit(s) against the KPI's submissions.
+     * Shows this sub-area's KPIs for one academic year. All months'
+     * submissions for that year are sent down so the Month select can
+     * switch client-side without a round trip; switching the Academic
+     * Year select does trigger a round trip, since that changes which
+     * targets/submissions are eligible at all.
      */
-    public function kra(string $code): Response
+    public function kra(Request $request, string $code): Response
     {
-        $currentYear = AcademicYear::where('is_current', true)->first();
+        $academicYears = AcademicYear::query()
+            ->orderByDesc('id')
+            ->get(['id', 'label', 'is_current']);
+
+        $selectedAcademicYear = null;
+
+        if ($request->filled('academic_year_id')) {
+            $selectedAcademicYear = $academicYears->firstWhere(
+                'id',
+                (int) $request->input('academic_year_id'),
+            );
+        }
+
+        $selectedAcademicYear ??= $academicYears->firstWhere('is_current', true);
+        $selectedAcademicYear ??= $academicYears->first();
 
         $subArea = KraSubArea::query()
             ->where('code', $code)
@@ -36,13 +50,13 @@ class ReportController extends Controller
                 'kra:id,number,title,reference',
                 'kpis.units:id,code,name',
                 'kpis.actionPlans.units:id,code,name',
-                'kpis.targets' => fn ($q) => $currentYear
-                    ? $q->where('academic_year_id', $currentYear->id)
+                'kpis.targets' => fn ($q) => $selectedAcademicYear
+                    ? $q->where('academic_year_id', $selectedAcademicYear->id)
                     : $q,
-                'kpis.monthlySubmissions' => fn ($q) => $currentYear
-                    ? $q->where('academic_year_id', $currentYear->id)
-                        ->orderByDesc('year')->orderByDesc('month')
-                    : $q->orderByDesc('year')->orderByDesc('month'),
+                'kpis.monthlySubmissions' => fn ($q) => $selectedAcademicYear
+                    ? $q->where('academic_year_id', $selectedAcademicYear->id)
+                        ->orderBy('year')->orderBy('month')
+                    : $q->orderBy('year')->orderBy('month'),
                 'kpis.monthlySubmissions.unit:id,code,name',
             ])
             ->firstOrFail();
@@ -53,7 +67,8 @@ class ReportController extends Controller
                 'title' => $subArea->title,
                 'kra' => $subArea->kra,
             ],
-            'currentAcademicYear' => $currentYear,
+            'academicYears' => $academicYears,
+            'selectedAcademicYear' => $selectedAcademicYear,
             'kpis' => $subArea->kpis,
         ]);
     }
@@ -69,7 +84,7 @@ class ReportController extends Controller
             'month' => ['required', 'integer', 'min:1', 'max:12'],
         ]);
 
-        $submissions = \App\Models\MonthlySubmission::query()
+        $submissions = MonthlySubmission::query()
             ->where('year', $validated['year'])
             ->where('month', $validated['month'])
             ->with(['kpi.subArea.kra:id,number,title', 'unit:id,code,name'])
