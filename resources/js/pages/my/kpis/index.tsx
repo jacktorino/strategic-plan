@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { Building2, Check, Loader2, Send, Target } from 'lucide-react';
+import {
+    Building2,
+    Check,
+    Loader2,
+    Send,
+    Target,
+    CalendarDays,
+} from 'lucide-react';
 import axios from 'axios';
 
 import { Badge } from '@/components/ui/badge';
@@ -48,23 +55,20 @@ type Kpi = {
     active_target: string;
 };
 
-type Kra = {
+interface Kra {
     id: number;
     code: string;
-    title: string;
-    kpis: Kpi[];
-};
+    title: string; // Will now hold "Governance and Leadership" (KRA 1 Title)
+    sub_area_code: string; // Will hold "1.1"
+    sub_area_title: string; // Will hold "Governance"
+    kpis: any[];
+}
 
-type Props = {
+interface Props {
     kras: Kra[];
     selectedAY: string;
     unitCode: string;
-    // Optional — backend can pass the real list of academic years (e.g.
-    // from AcademicYear::orderByDesc('start_year')->pluck(...)). Falls back
-    // to a generated range around selectedAY if not provided, so this still
-    // renders sensibly before the controller is updated to pass it.
-    academicYears?: string[];
-};
+}
 
 const MONTHS = [
     'January',
@@ -331,15 +335,26 @@ export default function UnitKpis({
             <div className="mx-auto w-full space-y-6 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm">
                     {kras.length > 0 ? (
-                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight uppercase">
-                            <Target className="h-6 w-6 shrink-0 text-emerald-600" />
-                            KRA {kras[0].code} : {kras[0].title}
-                        </h1>
+                        <div className="flex items-start gap-3">
+                            <Target className="mt-1 h-6 w-6 shrink-0 text-emerald-600" />
+                            <div>
+                                <h1 className="text-2xl leading-none font-bold tracking-tight uppercase">
+                                    KRA {kras[0].code} : {kras[0].title}
+                                </h1>
+                                {/* Small sub-area details without labels */}
+                                <p className="mt-1 text-sm font-medium text-muted-foreground normal-case">
+                                    {kras[0].sub_area_code} —{' '}
+                                    {kras[0].sub_area_title}
+                                </p>
+                            </div>
+                        </div>
                     ) : (
-                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+                        <div className="flex items-center gap-2">
                             <Target className="h-6 w-6 text-emerald-600" />
-                            My KPIs
-                        </h1>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                My KPIs
+                            </h1>
+                        </div>
                     )}
 
                     <div className="flex flex-wrap items-center gap-3">
@@ -390,6 +405,24 @@ export default function UnitKpis({
                                 </SelectContent>
                             </Select>
                         </label>
+                    </div>
+                </div>
+
+                {/* Prominent Month Header Section */}
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-emerald-600 p-2 text-white">
+                            <CalendarDays className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold tracking-tight text-emerald-950">
+                                Submitting Achievements for {selectedMonth}
+                            </h2>
+                            <p className="text-sm text-emerald-700/80">
+                                Update and submit your unit's compliance
+                                percentages for the month of {selectedMonth}.
+                            </p>
+                        </div>
                     </div>
                 </div>
 

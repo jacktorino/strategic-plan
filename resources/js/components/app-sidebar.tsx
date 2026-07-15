@@ -183,7 +183,7 @@ const unitNavItems: NavItem[] = [
     // { title: 'My Action Plans', href: '/my/action-plans', icon: CheckSquare },
     {
         title: 'Propose a KPI',
-        href: '/my/kpi-submissions/create',
+        href: '/my/propose-kpi', // <-- Fixed here (removed /index)
         icon: FilePlus2,
     },
     { title: 'My Reports', href: '/my/reports', icon: BarChart3 },
@@ -220,7 +220,7 @@ function NavKeyResultAreas() {
                         return (
                             <Collapsible
                                 key={kra.number}
-                                defaultOpen={false}
+                                defaultOpen={kra.number === 1}
                                 className="group/collapsible"
                             >
                                 <SidebarMenuItem>

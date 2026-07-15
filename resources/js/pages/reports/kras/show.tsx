@@ -1,6 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { ChevronRight, Home } from 'lucide-react';
-import { Fragment, useMemo, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 import {
     Select,
@@ -207,56 +206,24 @@ function collectMonthOptions(kpis: Kpi[]): MonthOption[] {
     );
 }
 
-function UnitBadges({ units }: { units: Unit[] }) {
+// Units are just "who's currently involved" for a plan/KPI — not a formal
+// assignment — so they're rendered as plain, low-emphasis text rather than
+// bordered "role" badges. Purely reflects whatever units are in the data.
+function InvolvedUnits({ units }: { units: Unit[] }) {
     if (units.length === 0) {
         return <span className="text-sm text-muted-foreground">—</span>;
     }
     return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap justify-center gap-1">
             {units.map((unit) => (
                 <span
                     key={unit.id}
-                    className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium"
+                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                 >
                     {unit.code}
                 </span>
             ))}
         </div>
-    );
-}
-
-// Simple breadcrumb trail — rendered locally instead of via AppLayout.
-function Breadcrumbs({ items }: { items: { title: string; href?: string }[] }) {
-    return (
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Home className="h-3.5 w-3.5" />
-            {items.map((item, index) => {
-                const isLast = index === items.length - 1;
-                return (
-                    <Fragment key={item.href ?? item.title}>
-                        {index > 0 && (
-                            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                        )}
-                        {item.href && !isLast ? (
-                            <Link
-                                href={item.href}
-                                className="transition-colors hover:text-foreground"
-                            >
-                                {item.title}
-                            </Link>
-                        ) : (
-                            <span
-                                className={
-                                    isLast ? 'font-medium text-foreground' : ''
-                                }
-                            >
-                                {item.title}
-                            </span>
-                        )}
-                    </Fragment>
-                );
-            })}
-        </nav>
     );
 }
 
@@ -345,7 +312,7 @@ function MonthSubmissionCell({
 }
 
 // One row per action plan. Column order: KPI (merged) | Selected month |
-// Action plan | Responsible units
+// Action plan | Units involved
 function ActionPlanRow({
     kpi,
     plan,
@@ -386,13 +353,17 @@ function ActionPlanRow({
                 <p className="text-sm leading-relaxed">{plan.description}</p>
             </TableCell>
 
-            <TableCell className="min-w-[140px] text-center">
-                <UnitBadges units={plan.units} />
-            </TableCell>
+            {isFirstInKpi && (
+                <TableCell
+                    rowSpan={kpiRowSpan}
+                    className="min-w-[140px] border-l text-center align-top"
+                >
+                    <InvolvedUnits units={kpi.units} />
+                </TableCell>
+            )}
         </TableRow>
     );
 }
-
 // A KPI with no action plans still gets one editable row on the staff
 // submission page (action_plan_id = null), so its submissions need to be
 // shown here too rather than replaced by a static placeholder.
@@ -421,27 +392,24 @@ function KpiOnlyRow({
                 />
             </TableCell>
 
-            <TableCell colSpan={2}>
+            <TableCell>
                 <span className="text-sm text-muted-foreground">
                     No action plans defined for this KPI yet.
                 </span>
             </TableCell>
+
+            <TableCell className="min-w-[140px] border-l text-center align-top">
+                <InvolvedUnits units={kpi.units} />
+            </TableCell>
         </TableRow>
     );
 }
-
 export default function Show({
     subArea,
     academicYears,
     selectedAcademicYear,
     kpis,
 }: Props) {
-    const breadcrumbs = [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Key result areas', href: '/kras' },
-        { title: `${subArea.code} ${subArea.title}` },
-    ];
-
     const monthOptions = useMemo(() => collectMonthOptions(kpis), [kpis]);
 
     const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(
@@ -488,70 +456,76 @@ export default function Show({
 
     return (
         <>
-            <Head title={`${subArea.code} ${subArea.title}`} />
+            <Head title={`${subArea.title}`} />
 
             <div className="flex flex-col gap-6 p-4">
-                <Breadcrumbs items={breadcrumbs} />
-                <div className="flex flex-wrap items-center justify-end gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                            Academic year
-                        </span>
-                        <Select
-                            value={
-                                selectedAcademicYear
-                                    ? String(selectedAcademicYear.id)
-                                    : undefined
-                            }
-                            onValueChange={handleAcademicYearChange}
-                        >
-                            <SelectTrigger className="w-[170px]">
-                                <SelectValue placeholder="Select year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {academicYears.map((ay) => (
-                                    <SelectItem
-                                        key={ay.id}
-                                        value={String(ay.id)}
-                                    >
-                                        {ay.label}
-                                        {ay.is_current ? ' (current)' : ''}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                {/* Header: title + filters share one row, left-aligned */}
+                <div className="flex flex-wrap items-center gap-6">
+                    <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                            KRA {subArea.kra.number}: {subArea.kra.title}
+                            {subArea.kra.reference &&
+                                ` · ${subArea.kra.reference}`}
+                        </p>
+                        <h1 className="text-2xl font-semibold">
+                            {subArea.code} {subArea.title}
+                        </h1>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                            Month
-                        </span>
-                        <Select
-                            value={selectedMonthKey ?? undefined}
-                            onValueChange={setSelectedMonthKey}
-                            disabled={monthOptions.length === 0}
-                        >
-                            <SelectTrigger className="w-[150px]">
-                                <SelectValue placeholder="No submissions" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {monthOptions.map((m) => (
-                                    <SelectItem key={m.key} value={m.key}>
-                                        {m.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Academic year
+                            </span>
+                            <Select
+                                value={
+                                    selectedAcademicYear
+                                        ? String(selectedAcademicYear.id)
+                                        : undefined
+                                }
+                                onValueChange={handleAcademicYearChange}
+                            >
+                                <SelectTrigger className="w-[170px]">
+                                    <SelectValue placeholder="Select year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {academicYears.map((ay) => (
+                                        <SelectItem
+                                            key={ay.id}
+                                            value={String(ay.id)}
+                                        >
+                                            {ay.label}
+                                            {ay.is_current ? ' (current)' : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Month
+                            </span>
+                            {/* Emphasized — the month is the primary lens
+                                for everything shown below it */}
+                            <Select
+                                value={selectedMonthKey ?? undefined}
+                                onValueChange={setSelectedMonthKey}
+                                disabled={monthOptions.length === 0}
+                            >
+                                <SelectTrigger className="w-[160px] border-primary/30 bg-primary/5 font-semibold text-foreground">
+                                    <SelectValue placeholder="No submissions" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {monthOptions.map((m) => (
+                                        <SelectItem key={m.key} value={m.key}>
+                                            {m.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                        KRA {subArea.kra.number}: {subArea.kra.title}
-                        {subArea.kra.reference && ` · ${subArea.kra.reference}`}
-                    </p>
-                    <h1 className="text-2xl font-medium">
-                        {subArea.code} {subArea.title}
-                    </h1>
                 </div>
 
                 <Separator />
@@ -569,12 +543,23 @@ export default function Show({
                                         Key Performance Indicator
                                     </TableHead>
                                     <TableHead>
-                                        {selectedMonth
-                                            ? `${monthNames[selectedMonth.month - 1]} ${selectedMonth.year}`
-                                            : 'Submission'}
+                                        {selectedMonth ? (
+                                            <span className="text-sm font-semibold text-foreground">
+                                                {
+                                                    monthNames[
+                                                        selectedMonth.month - 1
+                                                    ]
+                                                }{' '}
+                                                {selectedMonth.year}
+                                            </span>
+                                        ) : (
+                                            'Submission'
+                                        )}
                                     </TableHead>
-                                    <TableHead>Action plan</TableHead>
-                                    <TableHead>Responsible units</TableHead>
+                                    <TableHead>
+                                        Innovative Action plan
+                                    </TableHead>
+                                    <TableHead>Responsible Unit</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

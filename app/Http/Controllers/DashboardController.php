@@ -109,7 +109,7 @@ class DashboardController extends Controller
 
         $kraRows = DB::table('key_result_areas')->orderBy('number')->get();
 
-        $kraPerformance = $kraRows->map(function ($kra) use ($academicYearId) {
+    $kraPerformance = $kraRows->map(function ($kra) use ($academicYearId) {
             // KPIs sit under kra_sub_areas now, not directly under key_result_areas.
             $kpiIds = DB::table('key_performance_indicators')
                 ->join('kra_sub_areas', 'key_performance_indicators.sub_area_id', '=', 'kra_sub_areas.id')

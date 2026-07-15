@@ -10,7 +10,7 @@ class UnitKpiSubmissionController extends Controller
 public function index() { return inertia('my/kpi-submissions/index'); }
 public function create()
     {
-        return inertia('my/kpi-submissions/create');
+        return inertia('my/kpi-submissions/index');
     }
     // App\Http\Controllers\Unit\UnitKpiSubmissionController.php
 public function store(Request $request)

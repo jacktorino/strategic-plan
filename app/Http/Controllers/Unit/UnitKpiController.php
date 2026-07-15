@@ -27,54 +27,56 @@ class UnitKpiController extends Controller
      * renders whatever sub-area code is requested (or the user's own
      * kra_sub_area_id if set, falling back to "1.1" for now).
      */
-    public function index(Request $request): Response
-    {
-        $user = Auth::user();
-        $academicYear = $this->resolveAcademicYear($request);
+   public function index(Request $request): Response
+{
+    $user = Auth::user();
+    $academicYear = $this->resolveAcademicYear($request);
 
-        $code = $request->query('sub_area', $user->kraSubArea->code ?? '1.1');
+    $code = $request->query('sub_area', $user->kraSubArea->code ?? '1.1');
 
-        $subArea = \App\Models\KraSubArea::where('code', $code)
-            ->with([
-                'kra:id,number,title',
-                'kpis.subArea.kra:id,number,title',
-                'kpis.units:id,code,name',
-                'kpis.actionPlans.units:id,code,name',
-                'kpis.targets' => fn ($q) => $academicYear
-                    ? $q->where('academic_year_id', $academicYear->id)
-                    : $q,
-                'kpis.monthlySubmissions' => fn ($q) => $academicYear
-                    ? $q->where('academic_year_id', $academicYear->id)->orderBy('month')
-                    : $q->orderBy('month'),
-                'kpis.monthlySubmissions.unit:id,code,name',
-            ])
-            ->first();
+    $subArea = \App\Models\KraSubArea::where('code', $code)
+        ->with([
+            'kra:id,number,title',
+            'kpis.subArea.kra:id,number,title',
+            'kpis.units:id,code,name',
+            'kpis.actionPlans.units:id,code,name',
+            'kpis.targets' => fn ($q) => $academicYear
+                ? $q->where('academic_year_id', $academicYear->id)
+                : $q,
+            'kpis.monthlySubmissions' => fn ($q) => $academicYear
+                ? $q->where('academic_year_id', $academicYear->id)->orderBy('month')
+                : $q->orderBy('month'),
+            'kpis.monthlySubmissions.unit:id,code,name',
+        ])
+        ->first();
 
-        if (! $subArea) {
-            return Inertia::render('my/kpis/index', [
-                'kras' => [],
-                'selectedAY' => $academicYear
-                    ? "{$academicYear->start_year}-{$academicYear->end_year}"
-                    : '',
-                'unitCode' => $code,
-            ]);
-        }
-
-        $kra = $subArea->kra;
-
+    if (! $subArea) {
         return Inertia::render('my/kpis/index', [
-            'kras' => [[
-                'id' => $kra->id,
-                'code' => (string) $kra->number,
-                'title' => "{$subArea->code} {$subArea->title}",
-                'kpis' => $subArea->kpis->map(fn (Kpi $kpi) => $this->formatKpi($kpi)),
-            ]],
+            'kras' => [],
             'selectedAY' => $academicYear
                 ? "{$academicYear->start_year}-{$academicYear->end_year}"
                 : '',
-            'unitCode' => $subArea->code,
+            'unitCode' => $code,
         ]);
     }
+
+    $kra = $subArea->kra;
+
+    return Inertia::render('my/kpis/index', [
+        'kras' => [[
+            'id' => $kra->id,
+            'code' => (string) $kra->number,
+            'title' => $kra->title, // <-- Sends the actual KRA Name (e.g. "Governance and Leadership")
+            'sub_area_code' => $subArea->code, // <-- Sends "1.1"
+            'sub_area_title' => $subArea->title, // <-- Sends "Governance"
+            'kpis' => $subArea->kpis->map(fn (Kpi $kpi) => $this->formatKpi($kpi)),
+        ]],
+        'selectedAY' => $academicYear
+            ? "{$academicYear->start_year}-{$academicYear->end_year}"
+            : '',
+        'unitCode' => $subArea->code,
+    ]);
+}
 
     private function formatKpi(Kpi $kpi): array
     {

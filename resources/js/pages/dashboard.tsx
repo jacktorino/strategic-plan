@@ -77,6 +77,10 @@ export default function Dashboard({ role, unit, metrics }: Props) {
 // =========================================================================
 function AdminDashboardView({ metrics }: { metrics: any }) {
     const systemActivityData = metrics.activity ?? [];
+    // Expected shape: [{ unit: 'CAS', submissions: 12 }, ...]
+    // — how many monthly submissions each unit has filed this AY, so
+    // an admin can spot units that have gone quiet.
+    const unitEngagement = metrics.unit_engagement ?? [];
 
     return (
         <div className="space-y-6">
@@ -210,6 +214,62 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
                     </div>
                 </div>
             </div>
+
+            <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+                <div>
+                    <h3 className="text-lg leading-none font-semibold">
+                        Submissions by Unit
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                        Which units have been reporting this academic year — a
+                        quick way to spot units that have gone quiet.
+                    </p>
+                </div>
+                <div className="h-[260px] w-full pt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            data={unitEngagement}
+                            margin={{
+                                top: 10,
+                                right: 10,
+                                left: -20,
+                                bottom: 0,
+                            }}
+                        >
+                            <CartesianGrid
+                                strokeDasharray="3 3"
+                                vertical={false}
+                                className="stroke-muted"
+                            />
+                            <XAxis
+                                dataKey="unit"
+                                tickLine={false}
+                                axisLine={false}
+                                className="fill-muted-foreground text-xs"
+                                interval={0}
+                                angle={-30}
+                                textAnchor="end"
+                                height={50}
+                            />
+                            <YAxis
+                                tickLine={false}
+                                axisLine={false}
+                                className="fill-muted-foreground text-xs"
+                            />
+                            <Tooltip
+                                cursor={{ fill: 'rgba(185, 144, 46, 0.08)' }}
+                                formatter={(value) => [value, 'Submissions']}
+                            />
+                            <Bar
+                                dataKey="submissions"
+                                fill={BRAND.gold}
+                                radius={[4, 4, 0, 0]}
+                                barSize={28}
+                            />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
         </div>
     );
 }
@@ -218,6 +278,15 @@ function AdminDashboardView({ metrics }: { metrics: any }) {
 // 2. STAFF / UNIT DASHBOARD
 // =========================================================================
 function StaffDashboardView({ metrics }: { metrics: any }) {
+    // Expected shape: [{ month: 'Jan', compliance: 82 }, ...]
+    // — this unit's own average compliance percentage across its
+    // assigned KPIs, by month.
+    const monthlyTrend = metrics.monthly_trend ?? [];
+    // Expected shape: [{ name: 'On track', value: 6, color: '#0E3B27' },
+    //   { name: 'Needs attention', value: 2, color: '#B9902E' },
+    //   { name: 'Not yet submitted', value: 3, color: '#D1D5DB' }]
+    const submissionStatus = metrics.submission_status ?? [];
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -244,6 +313,122 @@ function StaffDashboardView({ metrics }: { metrics: any }) {
                         <CalendarDays className="h-5 w-5 text-muted-foreground" />
                     }
                 />
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-3">
+                <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:col-span-2">
+                    <div>
+                        <h3 className="text-lg leading-none font-semibold">
+                            Compliance Trend
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            Your unit's average compliance percentage by month.
+                        </p>
+                    </div>
+                    <div className="h-[240px] w-full pt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                                data={monthlyTrend}
+                                margin={{
+                                    top: 10,
+                                    right: 10,
+                                    left: -20,
+                                    bottom: 0,
+                                }}
+                            >
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={false}
+                                    className="stroke-muted"
+                                />
+                                <XAxis
+                                    dataKey="month"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="fill-muted-foreground text-xs"
+                                />
+                                <YAxis
+                                    domain={[0, 100]}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="fill-muted-foreground text-xs"
+                                />
+                                <Tooltip
+                                    formatter={(value) => [
+                                        `${value}%`,
+                                        'Compliance',
+                                    ]}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="compliance"
+                                    stroke={BRAND.forest}
+                                    strokeWidth={2}
+                                    dot={{ fill: BRAND.forest }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="flex flex-col justify-between space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+                    <div>
+                        <h3 className="text-md font-semibold">
+                            Submission Status
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                            Where your assigned KPIs stand this period.
+                        </p>
+                    </div>
+                    <div className="relative flex h-[170px] w-full items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={submissionStatus}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={70}
+                                    paddingAngle={4}
+                                    dataKey="value"
+                                >
+                                    {submissionStatus.map(
+                                        (entry: any, index: number) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={entry.color}
+                                            />
+                                        ),
+                                    )}
+                                </Pie>
+                                <Tooltip
+                                    formatter={(value) => [value, 'KPIs']}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-1.5">
+                        {submissionStatus.map((item: any, index: number) => (
+                            <div
+                                key={index}
+                                className="flex items-center justify-between text-xs"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="h-2.5 w-2.5 rounded-full"
+                                        style={{ backgroundColor: item.color }}
+                                    />
+                                    <span className="text-muted-foreground">
+                                        {item.name}
+                                    </span>
+                                </div>
+                                <span className="font-mono font-semibold">
+                                    {item.value}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             <div
@@ -291,6 +476,11 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
     const kraPerformanceData = metrics.kra_performance ?? [];
     const unitComplianceData = metrics.unit_compliance ?? [];
     const totalUnitsTracked = metrics.total_units_tracked ?? 0;
+    // Expected shape: [{ month: 'Jan', completion: 74 }, ...]
+    // — overall completion percentage across all KRAs, by month, so
+    // the president can see whether the institution is trending up
+    // or down over the academic year, not just a single snapshot.
+    const completionTrend = metrics.completion_trend ?? [];
 
     return (
         <div className="space-y-6">
@@ -460,6 +650,62 @@ function PresidentDashboardView({ metrics }: { metrics: any }) {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+                <div>
+                    <h3 className="text-lg leading-none font-semibold tracking-tight">
+                        Completion Trend
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                        Overall completion percentage across all KRAs, month
+                        over month — is the institution trending up or down?
+                    </p>
+                </div>
+                <div className="h-[240px] w-full pt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                            data={completionTrend}
+                            margin={{
+                                top: 10,
+                                right: 10,
+                                left: -20,
+                                bottom: 0,
+                            }}
+                        >
+                            <CartesianGrid
+                                strokeDasharray="3 3"
+                                vertical={false}
+                                className="stroke-muted"
+                            />
+                            <XAxis
+                                dataKey="month"
+                                tickLine={false}
+                                axisLine={false}
+                                className="fill-muted-foreground text-xs"
+                            />
+                            <YAxis
+                                domain={[0, 100]}
+                                tickLine={false}
+                                axisLine={false}
+                                className="fill-muted-foreground text-xs"
+                            />
+                            <Tooltip
+                                formatter={(value) => [
+                                    `${value}%`,
+                                    'Completion',
+                                ]}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="completion"
+                                stroke={BRAND.gold}
+                                strokeWidth={2}
+                                dot={{ fill: BRAND.gold }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
 
